@@ -1,0 +1,156 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag_latest:
+        description: 'Tag as latest release'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write        # Required to create and push release tags
+  pull-requests: write   # Required to create PRs for version updates
+  issues: write          # Required to create and manage labels on PRs
+
+jobs:
+  discover-modules:
+    name: Discover
+    uses: ./.github/workflows/discover.yml
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: discover-modules
+    outputs:
+      new_release_published: ${{ steps.manual-release.outputs.created || steps.semantic-release.outputs.new_release_published }}
+      new_release_version: ${{ steps.manual-release.outputs.version || steps.semantic-release.outputs.new_release_version }}
+      is_manual: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Configure Git
+      run: |
+        # Configure git user for semantic-release
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    # Manual release path
+    - name: Manual Release
+      id: manual-release
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        # Get the ref that was selected in "Use workflow from"
+        REF_NAME="${{ github.ref_name }}"
+
+        # Verify we're on a tag (not a branch)
+        if [[ ! "${{ github.ref }}" =~ ^refs/tags/ ]]; then
+          echo "Error: Manual release must be run from a tag, not a branch"
+          echo "Please select a tag from the 'Use workflow from' dropdown"
+          exit 1
+        fi
+
+        echo "Releasing from tag: $REF_NAME"
+
+        echo "created=true" >> $GITHUB_OUTPUT
+        echo "version=$REF_NAME" >> $GITHUB_OUTPUT
+        echo "tag=$REF_NAME" >> $GITHUB_OUTPUT
+
+    # Automatic semantic release path (only on push to main)
+    - name: Semantic Release
+      id: semantic-release
+      if: github.event_name == 'push'
+      uses: cycjimmy/semantic-release-action@v4
+      with:
+        semantic_version: 24.2.5
+        # Only install plugins that are not built-in to semantic-release
+        # Built-in plugins (automatically available):
+        #   - @semantic-release/commit-analyzer
+        #   - @semantic-release/release-notes-generator
+        #   - @semantic-release/github
+        # Extra plugins and presets (need explicit installation):
+        extra_plugins: |
+          @semantic-release/changelog@6.0.3
+          conventional-changelog-conventionalcommits@9.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Pull Request with Changelog
+      if: success() && steps.semantic-release.outputs.new_release_published == 'true'
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "chore(release): v${{ steps.semantic-release.outputs.new_release_version }} [skip ci]"
+        title: "chore(release): v${{ steps.semantic-release.outputs.new_release_version }}"
+        body: |
+          This PR contains the release changes for v${{ steps.semantic-release.outputs.new_release_version }}, including:
+          - Updated CHANGELOG.md
+          - Release tag: v${{ steps.semantic-release.outputs.new_release_version }}
+
+          This PR was automatically created by the release workflow.
+        branch: release-${{ steps.semantic-release.outputs.new_release_version }}
+        labels: |
+          kind/release
+          lifecycle/automated
+
+    - name: Build Terraform Modules
+      if: steps.manual-release.outputs.created == 'true' || steps.semantic-release.outputs.new_release_published == 'true'
+      run: |
+        # Create release directory
+        mkdir -p release-artifacts
+
+        # Get repository name for package naming
+        REPO_NAME=$(echo ${{ github.repository }} | cut -d'/' -f2)
+
+        # Determine version
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          RELEASE_VERSION="${{ steps.manual-release.outputs.version }}"
+        else
+          RELEASE_VERSION="${{ steps.semantic-release.outputs.new_release_version }}"
+        fi
+
+        # Package each discovered module dynamically
+        echo "Discovered modules: ${{ needs.discover-modules.outputs.modules }}"
+        echo "Release version: $RELEASE_VERSION"
+
+        # Parse modules JSON array and iterate
+        for module in $(echo '${{ needs.discover-modules.outputs.modules }}' | jq -r '.[]'); do
+          echo "Creating $module module package..."
+          tar --exclude-from $GITHUB_WORKSPACE/.gitignore \
+            -czf $GITHUB_WORKSPACE/release-artifacts/${REPO_NAME}-${module}-${RELEASE_VERSION}.tar.gz \
+            -C $GITHUB_WORKSPACE/modules/$module .
+        done
+
+        # List created artifacts
+        echo "Created artifacts:"
+        ls -la $GITHUB_WORKSPACE/release-artifacts/
+
+    - name: Create GitHub Release
+      if: steps.manual-release.outputs.created == 'true' || steps.semantic-release.outputs.new_release_published == 'true'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.manual-release.outputs.tag || format('v{0}', steps.semantic-release.outputs.new_release_version) }}
+        files: release-artifacts/*.tar.gz
+        make_latest: ${{ github.event_name == 'push' || github.event.inputs.tag_latest == 'true' }}
+        prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+        generate_release_notes: true
+        name: ${{ github.event_name == 'workflow_dispatch' && format('Release {0}', github.event.inputs.version) || '' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
