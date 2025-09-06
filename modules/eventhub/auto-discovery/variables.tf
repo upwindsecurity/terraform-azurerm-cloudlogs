@@ -4,7 +4,7 @@ variable "management_group_id" {
     Management group ID where the auto-discovery policy will be deployed.
     Should be in the format: /providers/Microsoft.Management/managementGroups/{mg-name}
   EOT
-  type = string
+  type        = string
 }
 
 variable "created_by" {
