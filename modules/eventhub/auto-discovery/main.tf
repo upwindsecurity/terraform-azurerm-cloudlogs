@@ -1,142 +1,124 @@
+# This auto-discovery module configures Azure Policy for automatic deployment
+# of diagnostic settings to stream Azure Activity Logs from subscriptions to
+# an Event Hub. It creates a custom Azure Policy definition and assignment at
+# the management group level with system-assigned managed identity for automated
+# deployment of diagnostic settings across subscriptions.
+
 locals {
-  root_management_group_id = "/providers/Microsoft.Management/managementGroups/${var.azure_tenant_id}"
+  # Extract management group name from the full resource ID for resource naming
+  # Example: "/providers/Microsoft.Management/managementGroups/my-mg" -> "my-mg"
+  management_group_name = basename(var.management_group_id)
+
+  # Collect role definition IDs for policy definition
+  # Use role_definition_resource_id for clean role definition IDs
+  all_role_definition_ids = (
+    concat(
+      [
+        for role_name in var.built_in_role_names :
+        data.azurerm_role_definition.built_in_role[role_name].id
+      ],
+      [
+        azurerm_role_definition.custom_diagnostics_role.role_definition_resource_id
+      ]
+    )
+  )
 }
 
-provider "azurerm" {
-  features {}
-  tenant_id       = var.azure_tenant_id
-  subscription_id = var.subscription_id
+# Data source to retrieve Azure RBAC role definitions by name.
+# These roles will be assigned to the policy assignment's managed identity
+# to grant necessary permissions for deploying diagnostic settings.
+data "azurerm_role_definition" "built_in_role" {
+  for_each = toset(var.built_in_role_names)
+  name     = each.key
 }
 
-resource "azurerm_user_assigned_identity" "auto_discovery" {
-  name                = "auto-discovery-identity"
-  location            = "northeurope"
-  resource_group_name = var.resource_group
+# Custom RBAC role definition for CloudLogs diagnostic settings operations.
+# This role provides specific permissions needed for diagnostic settings management
+# and Event Hub authorization rule operations required by the auto-discovery policy.
+resource "azurerm_role_definition" "custom_diagnostics_role" {
+  name        = "${var.custom_role_name}-${local.management_group_name}"
+  scope       = var.management_group_id
+  description = "Custom role for Upwind CloudLogs auto-discovery module"
+
+  permissions {
+    actions = var.custom_role_actions
+  }
+
+  assignable_scopes = [var.management_group_id]
 }
 
-resource "azurerm_policy_definition" "auto_discovery" {
-  name                = "upwind-acitivity-logs-auto-discovery"
+# Custom Azure Policy definition for automatic deployment of diagnostic settings.
+# This policy defines the rules and deployment template for creating diagnostic
+# settings that stream Azure Activity Logs to an Event Hub when they don't exist.
+resource "azurerm_policy_definition" "auto_discovery_policy" {
+  name                = var.policy_name
+  display_name        = var.policy_name
   policy_type         = "Custom"
   mode                = "All"
-  display_name        = "Upwind activity log auto-discovery"
-  description         = "Deploys the diagnostic settings for Azure Activity to stream subscriptions activity logs to a Event hub"
-  management_group_id = local.root_management_group_id
+  description         = var.policy_description
+  management_group_id = var.management_group_id
 
+  # Policy parameters definition
+  parameters = jsonencode(local.policy_parameters)
+
+  # Policy rule definition
+  policy_rule = jsonencode(local.policy_rule)
+
+  # Policy metadata for organization and tracking purposes.
   metadata = jsonencode({
-    category  = "Monitoring"
+    category  = var.policy_category
     createdBy = var.created_by
     createdOn = timestamp()
     updatedBy = null
     updatedOn = null
   })
-
-  parameters = jsonencode({
-    eventHubAuthRuleId = {
-      type = "String"
-      metadata = {
-        displayName       = "Event Hub Authorization Rule ID"
-        description       = "Resource ID of the Event Hub namespace authorization rule with Send claims."
-        assignPermissions = true
-      }
-    }
-    eventHubName = {
-      type = "String"
-      metadata = {
-        displayName = "Event Hub Name"
-        description = "Name of the Event Hub to which diagnostics will be sent."
-      }
-    }
-  })
-
-  policy_rule = jsonencode({
-    if = {
-      field  = "type"
-      equals = "Microsoft.Resources/subscriptions"
-    }
-    then = {
-      effect = "deployIfNotExists"
-      details = {
-        type            = "Microsoft.Insights/diagnosticSettings"
-        deploymentScope = "subscription"
-        existenceScope  = "subscription"
-        existenceCondition = {
-          allOf = [
-            {
-              field  = "Microsoft.Insights/diagnosticSettings/eventHubAuthorizationRuleId"
-              equals = "[parameters('eventHubAuthRuleId')]"
-            }
-          ]
-        }
-        deployment = {
-          location = var.region
-          properties = {
-            mode = "incremental"
-            template = {
-              "$schema"      = "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#"
-              contentVersion = "1.0.0.0"
-              parameters = {
-                eventHubAuthRuleId = { type = "string" }
-                eventHubName       = { type = "string" }
-              }
-              resources = [
-                {
-                  name       = var.diagnostic_settings_name
-                  type       = "Microsoft.Insights/diagnosticSettings"
-                  apiVersion = "2021-05-01-preview"
-                  location   = "Global"
-                  properties = {
-                    eventHubAuthorizationRuleId = "[parameters('eventHubAuthRuleId')]"
-                    eventHubName                = "[parameters('eventHubName')]"
-                    logs = [
-                      { category = "Administrative", enabled = true },
-                      { category = "Security", enabled = true }
-                    ]
-                  }
-                }
-              ]
-            }
-            parameters = {
-              eventHubAuthRuleId = { value = "[parameters('eventHubAuthRuleId')]" }
-              eventHubName       = { value = "[parameters('eventHubName')]" }
-            }
-          }
-        }
-        roleDefinitionIds = local.role_defs
-      }
-    }
-  })
 }
 
-locals {
-  role_names = ["Contributor", "Monitoring Contributor"]
-  role_defs  = [for role_name in local.role_names : data.azurerm_role_definition.this[role_name].id]
-}
-
-resource "azurerm_role_assignment" "auto_discovery" {
-  for_each           = toset(local.role_defs)
-  scope              = local.root_management_group_id
-  role_definition_id = each.value
-  principal_id       = azurerm_management_group_policy_assignment.auto_discovery.identity[0].principal_id
-}
-
-data "azurerm_role_definition" "this" {
-  for_each = toset(local.role_names)
-  name     = each.key
-  scope    = local.root_management_group_id
-}
-
-
+# Azure Policy assignment at the management group level.
+# Assigns the auto-discovery policy to the specified management group with a
+# system-assigned managed identity that will be used to deploy diagnostic settings.
 resource "azurerm_management_group_policy_assignment" "auto_discovery" {
-  name                 = "upwind-auto-discovery"
-  display_name         = "upwind-auto-discovery"
-  policy_definition_id = azurerm_policy_definition.auto_discovery.id
-  management_group_id  = local.root_management_group_id
+  name                 = var.policy_assignment_name
+  display_name         = var.policy_assignment_name
+  location             = var.region
+  policy_definition_id = azurerm_policy_definition.auto_discovery_policy.id
+  management_group_id  = var.management_group_id
+
+  # Policy parameters with Event Hub configuration for diagnostic settings
   parameters = jsonencode({
     eventHubAuthRuleId = { value = var.eventhub_authorization_rule_id }
     eventHubName       = { value = var.eventhub_name }
   })
-  location = var.region
+
+  # System-assigned managed identity for policy deployment operations
   identity {
     type = "SystemAssigned"
   }
+}
+
+# Role assignments for built-in roles to policy assignment managed identity.
+# Creates role assignments for each built-in role on the management group.
+resource "azurerm_role_assignment" "policy_builtin_roles" {
+  for_each = toset(var.built_in_role_names)
+
+  scope              = var.management_group_id
+  role_definition_id = data.azurerm_role_definition.built_in_role[each.value].role_definition_id
+  principal_id       = azurerm_management_group_policy_assignment.auto_discovery.identity[0].principal_id
+
+  depends_on = [
+    azurerm_management_group_policy_assignment.auto_discovery
+  ]
+}
+
+# Role assignment for custom role to policy assignment managed identity.
+# Creates role assignment for the custom role on the management group.
+resource "azurerm_role_assignment" "policy_custom_role" {
+  scope              = var.management_group_id
+  role_definition_id = azurerm_role_definition.custom_diagnostics_role.role_definition_resource_id
+  principal_id       = azurerm_management_group_policy_assignment.auto_discovery.identity[0].principal_id
+
+  depends_on = [
+    azurerm_management_group_policy_assignment.auto_discovery,
+    azurerm_role_definition.custom_diagnostics_role
+  ]
 }
