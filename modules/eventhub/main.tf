@@ -87,23 +87,25 @@ locals {
 
 
   # Tenant root management group
-  tenant_root_management_group_id = format(
-    "/providers/Microsoft.Management/managementGroups/%s",
-    var.tenant_id
-  )
+  # tenant_root_management_group_id = format(
+  #   "/providers/Microsoft.Management/managementGroups/%s",
+  #   var.tenant_id
+  # )
+
+
 
   # Auto-discovery module configuration
   auto_discovery_management_group_ids = (
     # If auto-discovery is disabled or using existing Event Hub, return an empty list
     !var.enable_auto_discovery || var.use_existing_eventhub
-    ? []
+    ? toset([])
 
     # If streaming all subscriptions, return the tenant root management group ID
     : var.stream_all_subscriptions
-    ? [local.tenant_root_management_group_id]
+    ? toset([var.tenant_id])
 
     # Otherwise, return the list of management group IDs
-    : var.stream_management_group_ids
+    : toset([for mg in data.azurerm_management_group.streaming : mg.id])
   )
 
   # Azure RBAC role definitions required for the integration.
