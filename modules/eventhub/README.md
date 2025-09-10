@@ -126,12 +126,14 @@ The executing principal needs the following permissions:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | >= 3.4 |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | >= 4.30, < 4.42 |
+| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.5.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.41.0 |
 
 ## Modules
 
-No modules.
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_auto_discovery"></a> [auto\_discovery](#module\_auto\_discovery) | ./auto-discovery | n/a |
 
 ## Resources
 
@@ -174,6 +176,7 @@ No modules.
 | <a name="input_diagnostic_setting_entra_log_categories"></a> [diagnostic\_setting\_entra\_log\_categories](#input\_diagnostic\_setting\_entra\_log\_categories) | List of Entra ID log categories to enable in the diagnostic setting.<br/>Currently, only `AuditLogs` and `SignInLogs` categories are<br/>supported by Upwind. Do not modify unless instructed by Upwind support. | `list(string)` | <pre>[<br/>  "AuditLogs",<br/>  "SignInLogs"<br/>]</pre> | no |
 | <a name="input_diagnostic_setting_entra_name"></a> [diagnostic\_setting\_entra\_name](#input\_diagnostic\_setting\_entra\_name) | The name of the Entra diagnostic setting to be created. | `string` | `"upwindsecurity-entra"` | no |
 | <a name="input_diagnostic_setting_name"></a> [diagnostic\_setting\_name](#input\_diagnostic\_setting\_name) | The name of the diagnostic setting to be created. | `string` | `"upwindsecurity"` | no |
+| <a name="input_enable_auto_discovery"></a> [enable\_auto\_discovery](#input\_enable\_auto\_discovery) | Whether to enable auto-discovery of diagnostic settings. | `bool` | `false` | no |
 | <a name="input_eventhub_authorization_rule_name"></a> [eventhub\_authorization\_rule\_name](#input\_eventhub\_authorization\_rule\_name) | The name of the authorization rule to be created. | `string` | `"upwindsecurity"` | no |
 | <a name="input_eventhub_consumer_group_name"></a> [eventhub\_consumer\_group\_name](#input\_eventhub\_consumer\_group\_name) | The name of the consumer group to be created. | `string` | `"upwindsecurity"` | no |
 | <a name="input_eventhub_enable_auto_inflate"></a> [eventhub\_enable\_auto\_inflate](#input\_eventhub\_enable\_auto\_inflate) | Whether to enable Event Hub namespace auto-inflate. | `bool` | `true` | no |
