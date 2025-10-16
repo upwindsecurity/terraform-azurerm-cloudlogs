@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.0.1](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.0.0...v1.0.1) (2025-10-16)
+
+### Code Refactoring
+
+* **modules:** update minimal terraform version ([#4](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/issues/4)) ([eabcc17](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/commit/eabcc176ec8638d5b4a32f10a6edfa25feac48ff))
+
 ## 1.0.0 (2025-09-02)
 
 ### Features
