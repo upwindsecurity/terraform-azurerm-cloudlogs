@@ -102,7 +102,7 @@ See the [examples](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs
 
 - Azure subscription with appropriate permissions
 - Azure AD tenant access
-- Terraform >= 1.2
+- Terraform >= 1.9
 - Azure CLI or service principal authentication
 
 ## Permissions Required
@@ -118,7 +118,7 @@ The executing principal needs the following permissions:
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.2 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | >= 3.4 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.30, < 4.42 |
 
@@ -126,8 +126,8 @@ The executing principal needs the following permissions:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | >= 3.4 |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | >= 4.30, < 4.42 |
+| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.5.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.41.0 |
 
 ## Modules
 

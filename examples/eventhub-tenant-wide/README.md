@@ -28,12 +28,15 @@ Before running this example, update the `locals` block in `main.tf` with your ac
 This example provides two tenant-wide streaming options:
 
 ### Option A: All Subscriptions (No Exclusions)
+
 ```hcl
 stream_all_subscriptions = true
 ```
+
 Streams logs from every subscription in the tenant.
 
 ### Option B: All Subscriptions with Exclusions (Default)
+
 ```hcl
 stream_exclude_subscription_ids = [
   "12345678-1234-1234-1234-test123",     # Test subscription
@@ -41,6 +44,7 @@ stream_exclude_subscription_ids = [
   "12345678-1234-1234-1234-sandbox789",  # Sandbox subscription
 ]
 ```
+
 Streams logs from all subscriptions except the specified ones.
 
 ## Features
@@ -71,7 +75,7 @@ This example requires:
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.2 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | >= 3.4 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.30, < 4.42 |
 
