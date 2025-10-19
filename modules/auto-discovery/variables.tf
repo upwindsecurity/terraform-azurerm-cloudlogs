@@ -62,9 +62,9 @@ variable "built_in_role_names" {
   ]
 }
 
-variable "diagnostic_setting_activity_log_categories" {
+variable "diagnostic_setting_log_categories" {
   description = <<-EOT
-    List of activity log categories to enable in the diagnostic setting.
+    List of log categories to enable in the diagnostic setting.
     Currently, only `Administrative` and `Security` categories are
     supported by Upwind. Do not modify unless instructed by Upwind support.
   EOT
@@ -76,7 +76,7 @@ variable "diagnostic_setting_activity_log_categories" {
 
   validation {
     condition = alltrue([
-      for category in var.diagnostic_setting_activity_log_categories :
+      for category in var.diagnostic_setting_log_categories :
       contains(["Administrative", "Security"], category)
     ])
     error_message = <<-EOT
@@ -91,7 +91,7 @@ variable "policy_name" {
     policy name and display name.
   EOT
   type        = string
-  default     = "upwind-activity-logs-auto-discovery"
+  default     = "upwind-logs"
 }
 
 variable "policy_description" {
@@ -100,7 +100,7 @@ variable "policy_description" {
     and functionality.
   EOT
   type        = string
-  default     = "Deploys the diagnostic settings for Azure Activity to stream subscriptions activity logs to an Event Hub"
+  default     = "Deploys the diagnostic settings to stream logs to an Event Hub that connected to Upwind logs intgration"
 }
 
 variable "policy_assignment_name" {
@@ -119,6 +119,15 @@ variable "policy_category" {
   EOT
   type        = string
   default     = "Upwind Policies"
+}
+
+variable "policy_deployment_scope" {
+  description = <<-EOT
+    Deployment scope for the Azure Policy assignment. This can be either
+    "subscription" or "resourceGroup".
+  EOT
+  type        = string
+  default     = "subscription"
 }
 
 variable "custom_role_name" {
@@ -142,4 +151,42 @@ variable "custom_role_actions" {
     "Microsoft.EventHub/namespaces/authorizationRules/listKeys/*",
     "Microsoft.Resources/deployments/*"
   ]
+}
+
+variable "policy_rule_condition_field" {
+  description = <<-EOT
+    Field for the Azure Policy rule. The policy will evaluate such field with existence condition
+  EOT
+  type        = string
+  default     = "type"
+}
+
+variable "policy_rule_condition_value" {
+  description = <<-EOT
+    Resource type for the Azure Policy rule.
+    The policy will evaluate resource met `policy_rule_condition_field` == `policy_rule_condition_value` with existence the condition
+  EOT
+  type        = string
+  default     = "Microsoft.Resources/subscriptions"
+}
+
+variable "policy_rule_condition_override" {
+  description = <<-EOT
+    Optional JSON object to completely override the policy rule condition.
+    If provided, this will replace the entire 'if' block in the policy rule.
+    When null, the default condition will be built using policy_rule_condition_field
+    and policy_rule_condition_value variables.
+  EOT
+  type        = object({})
+  default     = null
+}
+
+variable "resource_suffix" {
+  description = "The suffix to append to all resources created by this module."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9]{0,10}$", var.resource_suffix))
+    error_message = "The resource suffix must be alphanumeric and cannot exceed 10 characters."
+  }
 }

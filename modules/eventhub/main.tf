@@ -85,27 +85,23 @@ locals {
     var.tags
   )
 
-
-  # Tenant root management group
-  # tenant_root_management_group_id = format(
-  #   "/providers/Microsoft.Management/managementGroups/%s",
-  #   var.tenant_id
-  # )
-
-
-
   # Auto-discovery module configuration
   auto_discovery_management_group_ids = (
     # If auto-discovery is disabled or using existing Event Hub, return an empty list
     !var.enable_auto_discovery || var.use_existing_eventhub
     ? toset([])
 
-    # If streaming all subscriptions, return the tenant root management group ID
-    : var.stream_all_subscriptions
-    ? toset([var.tenant_id])
+    # If streaming all subscriptions or selected subscriptions, return the tenant root management group ID
+    : var.stream_all_subscriptions || length(var.stream_subscription_ids) > 0
+    ? toset(
+      ["/providers/Microsoft.Management/managementGroups/${var.tenant_id}"]
+    )
 
     # Otherwise, return the list of management group IDs
-    : toset([for mg in data.azurerm_management_group.streaming : mg.id])
+    : toset(
+      [for mg in data.azurerm_management_group.streaming :
+      "/providers/Microsoft.Management/managementGroups/${mg.id}"]
+    )
   )
 
   # Azure RBAC role definitions required for the integration.
@@ -383,11 +379,12 @@ resource "azurerm_monitor_aad_diagnostic_setting" "integration" {
 
 module "auto_discovery" {
   for_each                       = local.auto_discovery_management_group_ids
-  source                         = "./auto-discovery"
+  source                         = "../auto-discovery"
   created_by                     = data.azuread_client_config.current.object_id
   diagnostic_settings_name       = var.diagnostic_setting_name
   eventhub_authorization_rule_id = azurerm_eventhub_namespace_authorization_rule.new[0].id
   eventhub_name                  = local.eventhub_name
   region                         = local.region
   management_group_id            = each.value
+  resource_suffix                = var.resource_suffix
 }

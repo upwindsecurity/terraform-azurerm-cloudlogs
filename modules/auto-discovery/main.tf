@@ -22,6 +22,14 @@ locals {
       ]
     )
   )
+
+  policy_name = (
+    format(
+      "%s-%s",
+      var.policy_name,
+      var.resource_suffix
+    )
+  )
 }
 
 # Data source to retrieve Azure RBAC role definitions by name.
@@ -50,9 +58,9 @@ resource "azurerm_role_definition" "custom_diagnostics_role" {
 # Custom Azure Policy definition for automatic deployment of diagnostic settings.
 # This policy defines the rules and deployment template for creating diagnostic
 # settings that stream Azure Activity Logs to an Event Hub when they don't exist.
-resource "azurerm_policy_definition" "auto_discovery_policy" {
-  name                = var.policy_name
-  display_name        = var.policy_name
+resource "azurerm_policy_definition" "policy_definition" {
+  name                = local.policy_name
+  display_name        = local.policy_name
   policy_type         = "Custom"
   mode                = "All"
   description         = var.policy_description
@@ -77,11 +85,11 @@ resource "azurerm_policy_definition" "auto_discovery_policy" {
 # Azure Policy assignment at the management group level.
 # Assigns the auto-discovery policy to the specified management group with a
 # system-assigned managed identity that will be used to deploy diagnostic settings.
-resource "azurerm_management_group_policy_assignment" "auto_discovery" {
-  name                 = var.policy_assignment_name
-  display_name         = var.policy_assignment_name
+resource "azurerm_management_group_policy_assignment" "policy_assignment" {
+  name                 = local.policy_name
+  display_name         = local.policy_name
   location             = var.region
-  policy_definition_id = azurerm_policy_definition.auto_discovery_policy.id
+  policy_definition_id = azurerm_policy_definition.policy_definition.id
   management_group_id  = var.management_group_id
 
   # Policy parameters with Event Hub configuration for diagnostic settings
@@ -103,10 +111,10 @@ resource "azurerm_role_assignment" "policy_builtin_roles" {
 
   scope              = var.management_group_id
   role_definition_id = data.azurerm_role_definition.built_in_role[each.value].role_definition_id
-  principal_id       = azurerm_management_group_policy_assignment.auto_discovery.identity[0].principal_id
+  principal_id       = azurerm_management_group_policy_assignment.policy_assignment.identity[0].principal_id
 
   depends_on = [
-    azurerm_management_group_policy_assignment.auto_discovery
+    azurerm_management_group_policy_assignment.policy_assignment
   ]
 }
 
@@ -115,10 +123,10 @@ resource "azurerm_role_assignment" "policy_builtin_roles" {
 resource "azurerm_role_assignment" "policy_custom_role" {
   scope              = var.management_group_id
   role_definition_id = azurerm_role_definition.custom_diagnostics_role.role_definition_resource_id
-  principal_id       = azurerm_management_group_policy_assignment.auto_discovery.identity[0].principal_id
+  principal_id       = azurerm_management_group_policy_assignment.policy_assignment.identity[0].principal_id
 
   depends_on = [
-    azurerm_management_group_policy_assignment.auto_discovery,
+    azurerm_management_group_policy_assignment.policy_assignment,
     azurerm_role_definition.custom_diagnostics_role
   ]
 }
