@@ -7,11 +7,11 @@ locals {
     var.policy_rule_condition_override != null
     ? var.policy_rule_condition_override
     : (
-        {
-          field  = var.policy_rule_condition_field
-          equals = var.policy_rule_condition_value
-        }
-      )
+      {
+        field  = var.policy_rule_condition_field
+        equals = var.policy_rule_condition_value
+      }
+    )
   )
 
   # Policy parameters definition for Event Hub configuration.

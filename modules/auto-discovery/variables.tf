@@ -103,14 +103,6 @@ variable "policy_description" {
   default     = "Deploys the diagnostic settings to stream logs to an Event Hub that connected to Upwind logs intgration"
 }
 
-variable "policy_assignment_name" {
-  description = <<-EOT
-    Name for the Azure Policy assignment. This will be used for both the
-    assignment name and display name.
-  EOT
-  type        = string
-  default     = "upwind-auto-discovery"
-}
 
 variable "policy_category" {
   description = <<-EOT
