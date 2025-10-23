@@ -31,7 +31,7 @@ variable "diagnostic_settings_name" {
     created by the policy across subscriptions.
   EOT
   type        = string
-  default     = "upwind-activity-logs-auto-discovery"
+  default     = "upwindsecurity"
 }
 
 

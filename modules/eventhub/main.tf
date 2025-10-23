@@ -381,7 +381,7 @@ module "auto_discovery" {
   for_each                       = local.auto_discovery_management_group_ids
   source                         = "../auto-discovery"
   created_by                     = data.azuread_client_config.current.object_id
-  diagnostic_settings_name       = var.diagnostic_setting_name
+  diagnostic_settings_name       = local.diagnostic_setting_name
   eventhub_authorization_rule_id = azurerm_eventhub_namespace_authorization_rule.new[0].id
   eventhub_name                  = local.eventhub_name
   region                         = local.region
