@@ -1,7 +1,7 @@
 
 variable "management_group_id" {
   description = <<-EOT
-    Management group ID where the auto-discovery policy will be deployed.
+    Management group ID where the auto-discovery policy will be deployed. Can be the root tenant management group ID or a specific management group ID.
     Should be in the format: /providers/Microsoft.Management/managementGroups/{mg-name}
   EOT
   type        = string
