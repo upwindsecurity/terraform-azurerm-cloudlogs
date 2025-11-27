@@ -284,14 +284,14 @@ resource "azurerm_role_assignment" "monitoring_reader" {
 
 # Key Vault for storing integration service principal secrets.
 resource "azurerm_key_vault" "integration" {
-  name                      = local.key_vault_name
-  location                  = local.region
-  resource_group_name       = local.resource_group_name
-  tenant_id                 = var.tenant_id
-  sku_name                  = var.key_vault_sku_name
-  purge_protection_enabled  = var.key_vault_purge_protection_enabled
-  enable_rbac_authorization = var.key_vault_rbac_authorization_enabled
-  tags                      = local.common_tags
+  name                       = local.key_vault_name
+  location                   = local.region
+  resource_group_name        = local.resource_group_name
+  tenant_id                  = var.tenant_id
+  sku_name                   = var.key_vault_sku_name
+  purge_protection_enabled   = var.key_vault_purge_protection_enabled
+  rbac_authorization_enabled = var.key_vault_rbac_authorization_enabled
+  tags                       = local.common_tags
 
   dynamic "network_acls" {
     for_each = var.key_vault_network_acls_enabled ? [1] : []
