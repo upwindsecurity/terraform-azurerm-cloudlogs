@@ -295,6 +295,12 @@ variable "stream_exclude_subscription_ids" {
   default     = []
 }
 
+variable "enable_auto_discovery" {
+  description = "Whether to enable auto-discovery of diagnostic settings."
+  type        = bool
+  default     = false
+}
+
 # endregion streaming_scope
 
 # region key_vault

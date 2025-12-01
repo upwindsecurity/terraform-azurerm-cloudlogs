@@ -85,6 +85,25 @@ locals {
     var.tags
   )
 
+  # Auto-discovery module configuration
+  auto_discovery_management_group_ids = (
+    # If auto-discovery is disabled or using existing Event Hub, return an empty list
+    !var.enable_auto_discovery || var.use_existing_eventhub
+    ? toset([])
+
+    # If streaming all subscriptions or selected subscriptions, return the tenant root management group ID
+    : var.stream_all_subscriptions || length(var.stream_subscription_ids) > 0
+    ? toset(
+      ["/providers/Microsoft.Management/managementGroups/${var.tenant_id}"]
+    )
+
+    # Otherwise, return the list of management group IDs
+    : toset(
+      [for mg in data.azurerm_management_group.streaming :
+      "/providers/Microsoft.Management/managementGroups/${mg.id}"]
+    )
+  )
+
   # Azure RBAC role definitions required for the integration.
   role_eventhub_data_receiver    = "Azure Event Hubs Data Receiver"
   role_monitoring_reader         = "Monitoring Reader"
@@ -265,14 +284,14 @@ resource "azurerm_role_assignment" "monitoring_reader" {
 
 # Key Vault for storing integration service principal secrets.
 resource "azurerm_key_vault" "integration" {
-  name                      = local.key_vault_name
-  location                  = local.region
-  resource_group_name       = local.resource_group_name
-  tenant_id                 = var.tenant_id
-  sku_name                  = var.key_vault_sku_name
-  purge_protection_enabled  = var.key_vault_purge_protection_enabled
-  enable_rbac_authorization = var.key_vault_rbac_authorization_enabled
-  tags                      = local.common_tags
+  name                       = local.key_vault_name
+  location                   = local.region
+  resource_group_name        = local.resource_group_name
+  tenant_id                  = var.tenant_id
+  sku_name                   = var.key_vault_sku_name
+  purge_protection_enabled   = var.key_vault_purge_protection_enabled
+  rbac_authorization_enabled = var.key_vault_rbac_authorization_enabled
+  tags                       = local.common_tags
 
   dynamic "network_acls" {
     for_each = var.key_vault_network_acls_enabled ? [1] : []
@@ -356,4 +375,16 @@ resource "azurerm_monitor_aad_diagnostic_setting" "integration" {
       category = enabled_log.value
     }
   }
+}
+
+module "auto_discovery" {
+  for_each                       = local.auto_discovery_management_group_ids
+  source                         = "../auto-discovery"
+  created_by                     = data.azuread_client_config.current.object_id
+  diagnostic_settings_name       = local.diagnostic_setting_name
+  eventhub_authorization_rule_id = azurerm_eventhub_namespace_authorization_rule.new[0].id
+  eventhub_name                  = local.eventhub_name
+  region                         = local.region
+  management_group_id            = each.value
+  resource_suffix                = var.resource_suffix
 }
