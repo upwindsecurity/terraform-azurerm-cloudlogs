@@ -1,6 +1,9 @@
 # Tenant-Wide Azure Monitor Logs Example
 
-This example demonstrates how to use the Azure Monitor Logs module to create a new Event Hub infrastructure and enable Upwind to access logs from all subscriptions in your Azure tenant, with the ability to exclude specific subscriptions. This approach is ideal for comprehensive tenant-wide monitoring while maintaining control over which subscriptions to exclude.
+This example demonstrates how to use the Azure Monitor Logs module to create a new Event Hub infrastructure and enable
+Upwind to access logs from all subscriptions in your Azure tenant, with the ability to exclude specific subscriptions.
+This approach is ideal for comprehensive tenant-wide monitoring while maintaining control over which subscriptions to
+exclude.
 
 ## Usage
 
@@ -77,7 +80,7 @@ This example requires:
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | >= 3.4 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.30, < 4.42 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.42 |
 
 ## Providers
 

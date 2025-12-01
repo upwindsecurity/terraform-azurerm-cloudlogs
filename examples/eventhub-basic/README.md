@@ -1,6 +1,7 @@
 # Basic Azure Monitor Logs Example
 
-This example demonstrates how to use the Azure Monitor Logs module to create a new Event Hub infrastructure and enable Upwind to access logs from specific Azure subscriptions for comprehensive monitoring and security analysis.
+This example demonstrates how to use the Azure Monitor Logs module to create a new Event Hub infrastructure and enable
+Upwind to access logs from specific Azure subscriptions for comprehensive monitoring and security analysis.
 
 ## Usage
 
@@ -30,7 +31,7 @@ Before running this example, update the `locals` block in `main.tf` with your ac
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | >= 3.4 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.30, < 4.42 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.42 |
 
 ## Providers
 

@@ -1,6 +1,8 @@
 # Existing Event Hub Azure Monitor Logs Example
 
-This example demonstrates how to use the Azure Monitor Logs module with your existing Event Hub infrastructure to enable Upwind to access Azure Monitor Logs for comprehensive monitoring and security analysis. This approach minimizes infrastructure changes by leveraging your existing Event Hub setup.
+This example demonstrates how to use the Azure Monitor Logs module with your existing Event Hub infrastructure to enable
+Upwind to access Azure Monitor Logs for comprehensive monitoring and security analysis. This approach minimizes
+infrastructure changes by leveraging your existing Event Hub setup.
 
 ## Usage
 
@@ -48,7 +50,7 @@ This example requires that you have:
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | >= 3.4 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.30, < 4.42 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.42 |
 
 ## Providers
 
