@@ -1,6 +1,8 @@
 # Microsoft Azure Monitor Logs Module
 
-This Terraform module creates the necessary Azure infrastructure to enable Azure Monitor Logs monitoring with the Upwind platform using Azure Event Hubs. The module supports both creating new Event Hub infrastructure and integrating with existing Event Hub setups.
+This Terraform module creates the necessary Azure infrastructure to enable Azure Monitor Logs monitoring with the
+Upwind platform using Azure Event Hubs. The module supports both creating new Event Hub infrastructure and integrating
+with existing Event Hub setups.
 
 ## Usage
 
@@ -85,18 +87,24 @@ The module supports flexible streaming scope configuration with the following pr
 
 1. **Specific Subscriptions**: `stream_subscription_ids` - Stream from only specified subscriptions
 2. **Management Groups**: `stream_management_group_ids` - Stream from all subscriptions under management groups
-3. **All Subscriptions with Exclusions**: `stream_exclude_subscription_ids` - Stream from all subscriptions except specified ones
+3. **All Subscriptions with Exclusions**: `stream_exclude_subscription_ids` - Stream from all subscriptions except
+   specified ones
 4. **All Subscriptions**: `stream_all_subscriptions = true` - Stream from all subscriptions in tenant
 5. **Default**: Stream from infrastructure subscription only
 
 ## Examples
 
-See the [examples](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/) directory for complete working examples:
+See the [examples](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/) directory for
+complete working examples:
 
-- **[eventhub-basic](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-basic/)**: Simple subscription-based monitoring
-- **[eventhub-management-groups](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-management-groups/)**: Enterprise organizational monitoring
-- **[eventhub-existing](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-existing/)**: Integration with existing Event Hub infrastructure
-- **[eventhub-tenant-wide](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-tenant-wide/)**: Tenant-wide monitoring with exclusions
+- **[eventhub-basic](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-basic/)**:
+  Simple subscription-based monitoring
+- **[eventhub-management-groups](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-management-groups/)**:
+  Enterprise organizational monitoring
+- **[eventhub-existing](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-existing/)**:
+  Integration with existing Event Hub infrastructure
+- **[eventhub-tenant-wide](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-tenant-wide/)**:
+  Tenant-wide monitoring with exclusions
 
 ## Prerequisites
 
@@ -120,20 +128,20 @@ The executing principal needs the following permissions:
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | >= 3.4 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.30, < 4.42 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | >= 4.42.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.5.0 |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.41.0 |
+| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.7.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.54.0 |
 
 ## Modules
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_auto_discovery"></a> [auto\_discovery](#module\_auto\_discovery) | ./auto-discovery | n/a |
+| <a name="module_auto_discovery"></a> [auto\_discovery](#module\_auto\_discovery) | ../auto-discovery | n/a |
 
 ## Resources
 
