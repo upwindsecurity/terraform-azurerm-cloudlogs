@@ -30,6 +30,15 @@ locals {
       var.resource_suffix
     )
   )
+
+  role_definition_name = (
+    format(
+      "%s-%s-%s",
+      var.custom_role_name,
+      local.management_group_name,
+      var.resource_suffix
+    )
+  )
 }
 
 # Data source to retrieve Azure RBAC role definitions by name.
@@ -44,7 +53,7 @@ data "azurerm_role_definition" "built_in_role" {
 # This role provides specific permissions needed for diagnostic settings management
 # and Event Hub authorization rule operations required by the auto-discovery policy.
 resource "azurerm_role_definition" "custom_diagnostics_role" {
-  name        = "${var.custom_role_name}-${local.management_group_name}"
+  name        = local.role_definition_name
   scope       = var.management_group_id
   description = "Custom role for Upwind CloudLogs auto-discovery module"
 

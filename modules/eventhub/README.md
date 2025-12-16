@@ -135,7 +135,7 @@ The executing principal needs the following permissions:
 | Name | Version |
 |------|---------|
 | <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.7.0 |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.54.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.56.0 |
 
 ## Modules
 
