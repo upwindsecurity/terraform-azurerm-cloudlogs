@@ -69,6 +69,35 @@ variable "application_password_expiration_date" {
   }
 }
 
+variable "azure_application_client_id" {
+  description = "Optional client ID of an existing Azure AD application. If provided, the module will use this existing application instead of creating a new one. Mutually exclusive with application_name_prefix."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.azure_application_client_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.azure_application_client_id))
+    error_message = "The azure_application_client_id must be a valid GUID format."
+  }
+}
+
+variable "azure_application_client_secret" {
+  description = "Client secret for the existing Azure AD application. Required when azure_application_client_id is provided and organizational credentials will be created. Should be managed externally (e.g., Azure Portal, CLI, or separate automation)."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "azure_application_service_principal_object_id" {
+  description = "The service principal object ID of the existing Azure AD application. Optional, if provided the module will skip looking up the service principal object ID. Should be managed externally (e.g., Azure Portal, CLI, or separate automation)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.azure_application_service_principal_object_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.azure_application_service_principal_object_id))
+    error_message = "The azure_application_service_principal_object_id must be a valid GUID format."
+  }
+}
+
 # endregion azure_ad_application
 
 # region eventhub_configuration

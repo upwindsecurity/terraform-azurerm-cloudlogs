@@ -135,7 +135,7 @@ The executing principal needs the following permissions:
 | Name | Version |
 |------|---------|
 | <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.7.0 |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.56.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.57.0 |
 
 ## Modules
 
@@ -163,6 +163,7 @@ The executing principal needs the following permissions:
 | [azurerm_role_assignment.kv_secrets_officer](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.monitoring_reader](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azuread_client_config.current](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/client_config) | data source |
+| [azuread_service_principal.existing_sp](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/service_principal) | data source |
 | [azuread_service_principal.onboarding_sp](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/service_principal) | data source |
 | [azurerm_client_config.current_sp](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 | [azurerm_eventhub.existing](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/eventhub) | data source |
@@ -179,6 +180,9 @@ The executing principal needs the following permissions:
 | <a name="input_application_name_prefix"></a> [application\_name\_prefix](#input\_application\_name\_prefix) | The Upwind AD application display name prefix. | `string` | `"upwindsecurity-cloudlogs"` | no |
 | <a name="input_application_owners"></a> [application\_owners](#input\_application\_owners) | List of user IDs that will be set as owners of the Azure application &<br/>service principal. Each ID should be in the form of a GUID. If this list<br/>is left empty, the owner defaults to the authenticated principal. | `list(string)` | `[]` | no |
 | <a name="input_application_password_expiration_date"></a> [application\_password\_expiration\_date](#input\_application\_password\_expiration\_date) | The expiration date for the Azure AD application password in RFC3339 format<br/>(e.g., `2999-12-31T23:59:59Z`). This determines when the application<br/>password expires. | `string` | `"2999-12-31T23:59:59Z"` | no |
+| <a name="input_azure_application_client_id"></a> [azure\_application\_client\_id](#input\_azure\_application\_client\_id) | Optional client ID of an existing Azure AD application. If provided, the module will use this existing application instead of creating a new one. Mutually exclusive with application\_name\_prefix. | `string` | `null` | no |
+| <a name="input_azure_application_client_secret"></a> [azure\_application\_client\_secret](#input\_azure\_application\_client\_secret) | Client secret for the existing Azure AD application. Required when azure\_application\_client\_id is provided and organizational credentials will be created. Should be managed externally (e.g., Azure Portal, CLI, or separate automation). | `string` | `null` | no |
+| <a name="input_azure_application_service_principal_object_id"></a> [azure\_application\_service\_principal\_object\_id](#input\_azure\_application\_service\_principal\_object\_id) | The service principal object ID of the existing Azure AD application. Optional, if provided the module will skip looking up the service principal object ID. Should be managed externally (e.g., Azure Portal, CLI, or separate automation). | `string` | `null` | no |
 | <a name="input_diagnostic_setting_activity_log_categories"></a> [diagnostic\_setting\_activity\_log\_categories](#input\_diagnostic\_setting\_activity\_log\_categories) | List of activity log categories to enable in the diagnostic setting.<br/>Currently, only `Administrative` and `Security` categories are<br/>supported by Upwind. Do not modify unless instructed by Upwind support. | `list(string)` | <pre>[<br/>  "Administrative",<br/>  "Security"<br/>]</pre> | no |
 | <a name="input_diagnostic_setting_enable_entra_logs"></a> [diagnostic\_setting\_enable\_entra\_logs](#input\_diagnostic\_setting\_enable\_entra\_logs) | Whether to enable or disable Entra logs. | `bool` | `true` | no |
 | <a name="input_diagnostic_setting_entra_log_categories"></a> [diagnostic\_setting\_entra\_log\_categories](#input\_diagnostic\_setting\_entra\_log\_categories) | List of Entra ID log categories to enable in the diagnostic setting.<br/>Currently, only `AuditLogs` and `SignInLogs` categories are<br/>supported by Upwind. Do not modify unless instructed by Upwind support. | `list(string)` | <pre>[<br/>  "AuditLogs",<br/>  "SignInLogs"<br/>]</pre> | no |
@@ -229,8 +233,7 @@ The executing principal needs the following permissions:
 | <a name="output_eventhub_consumer_group_name"></a> [eventhub\_consumer\_group\_name](#output\_eventhub\_consumer\_group\_name) | The name of the consumer group created for processing logs. |
 | <a name="output_eventhub_name"></a> [eventhub\_name](#output\_eventhub\_name) | The name of the Event Hub used for Azure Monitor Logs monitoring. |
 | <a name="output_eventhub_namespace_name"></a> [eventhub\_namespace\_name](#output\_eventhub\_namespace\_name) | The name of the Event Hub namespace used for Azure Monitor Logs monitoring. |
-| <a name="output_integration_service_principal_client_id"></a> [integration\_service\_principal\_client\_id](#output\_integration\_service\_principal\_client\_id) | The client ID of the integration service principal. |
-| <a name="output_integration_service_principal_object_id"></a> [integration\_service\_principal\_object\_id](#output\_integration\_service\_principal\_object\_id) | The object ID of the integration service principal. |
 | <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | The name of the Azure Key Vault that contains the integration service<br/>principal secrets. |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | The name of the resource group where Event Hub resources are deployed. |
+| <a name="output_service_principal_object_id"></a> [service\_principal\_object\_id](#output\_service\_principal\_object\_id) | The object ID of the integration service principal. |
 <!-- END_TF_DOCS -->
