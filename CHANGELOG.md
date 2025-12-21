@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.1.4](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.3...v1.1.4) (2025-12-21)
+
+### Code Refactoring
+
+* **modules:** update key-vault permissions ([#13](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/issues/13)) ([46be383](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/commit/46be3837dee7c4e511cdae6145ee8304c6bf9fa2))
+
 ## [1.1.2](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.1...v1.1.2) (2025-12-16)
 
 ### Bug Fixes
