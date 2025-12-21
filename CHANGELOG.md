@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **modules:** update key-vault permissions ([#13](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/issues/13)) ([46be383](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/commit/46be3837dee7c4e511cdae6145ee8304c6bf9fa2))
 
+## [1.1.3](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.2...v1.1.3) (2025-12-21)
+
+### Code Refactoring
+
+* **modules:** allow using existing app registration ([#11](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/issues/11)) ([5376bcd](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/commit/5376bcd2a54dce34681dfeed039d9c3a604244b0))
+
 ## [1.1.2](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.1...v1.1.2) (2025-12-16)
 
 ### Bug Fixes
