@@ -8,6 +8,22 @@ locals {
   # Conditional creation flags.
   conditional_create_eventhub       = !var.use_existing_eventhub
   conditional_create_resource_group = !var.use_existing_eventhub && !var.use_existing_resource_group
+  conditional_create_application    = var.azure_application_client_id == null
+
+  # Get the service principal object ID (from either new or existing)
+  service_principal_object_id = (
+    local.conditional_create_application
+    ? azuread_service_principal.integration[0].object_id
+    : var.azure_application_service_principal_object_id != null
+    ? var.azure_application_service_principal_object_id
+    : data.azuread_service_principal.existing_sp[0].object_id
+  )
+  # Get the application client ID (from either new or existing)
+  application_client_id = (
+    local.conditional_create_application
+    ? azuread_application.integration[0].client_id
+    : var.azure_application_client_id
+  )
 
   # Resource group and region configuration.
   resource_group_name = (
@@ -111,7 +127,7 @@ locals {
 
   # Service principals that need Key Vault Secrets Officer access.
   key_vault_secrets_officer_principals = {
-    "integration_sp" = azuread_service_principal.integration.object_id
+    "integration_sp" = local.service_principal_object_id
     "onboarding_sp"  = data.azuread_service_principal.onboarding_sp.object_id
     "current_sp"     = data.azurerm_client_config.current_sp.object_id
   }
@@ -243,6 +259,7 @@ resource "azurerm_eventhub_namespace_authorization_rule" "new" {
 
 # Azure AD application for integration.
 resource "azuread_application" "integration" {
+  count        = local.conditional_create_application ? 1 : 0
   display_name = local.app_name
   owners = coalescelist(
     var.application_owners,
@@ -261,7 +278,8 @@ resource "azuread_application" "integration" {
 
 # Service principal for the integration application.
 resource "azuread_service_principal" "integration" {
-  client_id = azuread_application.integration.client_id
+  count     = local.conditional_create_application ? 1 : 0
+  client_id = azuread_application.integration[0].client_id
   owners = coalescelist(
     var.application_owners,
     [data.azuread_client_config.current.object_id]
@@ -270,15 +288,15 @@ resource "azuread_service_principal" "integration" {
 
 # Role assignment for Event Hub data receiver access.
 resource "azurerm_role_assignment" "eh_receiver" {
-  scope                = local.eventhub_namespace_id
   role_definition_name = local.role_eventhub_data_receiver
-  principal_id         = azuread_service_principal.integration.object_id
+  principal_id         = local.service_principal_object_id
+  scope                = local.eventhub_namespace_id
 }
 
 # Role assignment for monitoring reader access to subscription.
 resource "azurerm_role_assignment" "monitoring_reader" {
   role_definition_name = local.role_monitoring_reader
-  principal_id         = azuread_service_principal.integration.object_id
+  principal_id         = local.service_principal_object_id
   scope                = data.azurerm_subscription.current.id # infrastructure
 }
 
@@ -316,7 +334,7 @@ resource "azurerm_role_assignment" "kv_secrets_officer" {
 # Key Vault secret for service principal client ID.
 resource "azurerm_key_vault_secret" "sp_client_id" {
   name            = var.key_vault_client_id_secret_name
-  value           = azuread_application.integration.client_id
+  value           = local.application_client_id
   key_vault_id    = azurerm_key_vault.integration.id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
@@ -329,8 +347,12 @@ resource "azurerm_key_vault_secret" "sp_client_id" {
 
 # Key Vault secret for service principal client secret.
 resource "azurerm_key_vault_secret" "sp_client_secret" {
-  name            = var.key_vault_client_secret_secret_name
-  value           = [for p in azuread_application.integration.password : p.value][0]
+  name = var.key_vault_client_secret_secret_name
+  value = (
+    local.conditional_create_application
+    ? [for p in azuread_application.integration[0].password : p.value][0]
+    : var.azure_application_client_secret
+  )
   key_vault_id    = azurerm_key_vault.integration.id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date

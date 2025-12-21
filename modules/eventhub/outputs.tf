@@ -20,12 +20,17 @@ output "resource_group_name" {
 
 output "application_name" {
   description = "The display name of the Azure AD application."
-  value       = local.app_name
+  value       = local.conditional_create_application ? local.app_name : var.azure_application_client_id
 }
 
 output "application_client_id" {
   description = "The client ID of the Azure AD application."
-  value       = azuread_application.integration.client_id
+  value       = local.conditional_create_application ? azuread_application.integration[0].client_id : var.azure_application_client_id
+}
+
+output "service_principal_object_id" {
+  description = "The object ID of the integration service principal."
+  value       = local.service_principal_object_id
 }
 
 output "key_vault_name" {
@@ -34,14 +39,4 @@ output "key_vault_name" {
     principal secrets.
   EOT
   value       = local.key_vault_name
-}
-
-output "integration_service_principal_client_id" {
-  description = "The client ID of the integration service principal."
-  value       = azuread_service_principal.integration.client_id
-}
-
-output "integration_service_principal_object_id" {
-  description = "The object ID of the integration service principal."
-  value       = azuread_service_principal.integration.object_id
 }

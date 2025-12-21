@@ -30,3 +30,10 @@ data "azurerm_management_group" "streaming" {
   for_each = toset(var.stream_management_group_ids)
   name     = each.value
 }
+
+# Data source for existing service principal (when using existing app)
+# Skipped if a service principal object ID is provided
+data "azuread_service_principal" "existing_sp" {
+  count     = local.conditional_create_application || var.azure_application_service_principal_object_id != null ? 0 : 1
+  client_id = var.azure_application_client_id
+}
