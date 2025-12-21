@@ -124,13 +124,7 @@ locals {
   role_eventhub_data_receiver    = "Azure Event Hubs Data Receiver"
   role_monitoring_reader         = "Monitoring Reader"
   role_key_vault_secrets_officer = "Key Vault Secrets Officer"
-
-  # Service principals that need Key Vault Secrets Officer access.
-  key_vault_secrets_officer_principals = {
-    "integration_sp" = local.service_principal_object_id
-    "onboarding_sp"  = data.azuread_service_principal.onboarding_sp.object_id
-    "current_sp"     = data.azurerm_client_config.current_sp.object_id
-  }
+  role_key_vault_secret_user     = "Key Vault Secrets User"
 
   # Extract subscription IDs from management groups.
   management_group_subscription_ids = flatten([
@@ -322,12 +316,17 @@ resource "azurerm_key_vault" "integration" {
   }
 }
 
-# Role assignments for Key Vault secrets officer access.
+# Role assignments for Key Vault secrets officer access for current service principal .
 resource "azurerm_role_assignment" "kv_secrets_officer" {
-  for_each = local.key_vault_secrets_officer_principals
-
   role_definition_name = local.role_key_vault_secrets_officer
-  principal_id         = each.value
+  principal_id         = data.azurerm_client_config.current_sp.object_id
+  scope                = azurerm_key_vault.integration.id
+}
+
+# Role assignments for Key Vault secrets User access for current onboarding service principal .
+resource "azurerm_role_assignment" "kv_secrets_user" {
+  role_definition_name = local.role_key_vault_secret_user
+  principal_id         = data.azuread_service_principal.onboarding_sp.object_id
   scope                = azurerm_key_vault.integration.id
 }
 
@@ -341,7 +340,8 @@ resource "azurerm_key_vault_secret" "sp_client_id" {
   tags            = local.common_tags
 
   depends_on = [
-    azurerm_role_assignment.kv_secrets_officer
+    azurerm_role_assignment.kv_secrets_officer,
+    azurerm_role_assignment.kv_secrets_user,
   ]
 }
 
@@ -359,7 +359,8 @@ resource "azurerm_key_vault_secret" "sp_client_secret" {
   tags            = local.common_tags
 
   depends_on = [
-    azurerm_role_assignment.kv_secrets_officer
+    azurerm_role_assignment.kv_secrets_officer,
+    azurerm_role_assignment.kv_secrets_user
   ]
 }
 
