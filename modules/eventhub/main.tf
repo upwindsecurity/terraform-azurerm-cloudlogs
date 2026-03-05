@@ -8,22 +8,6 @@ locals {
   # Conditional creation flags.
   conditional_create_eventhub       = !var.use_existing_eventhub
   conditional_create_resource_group = !var.use_existing_eventhub && !var.use_existing_resource_group
-  conditional_create_application    = var.azure_application_client_id == null
-
-  # Get the service principal object ID (from either new or existing)
-  service_principal_object_id = (
-    local.conditional_create_application
-    ? azuread_service_principal.integration[0].object_id
-    : var.azure_application_service_principal_object_id != null
-    ? var.azure_application_service_principal_object_id
-    : data.azuread_service_principal.existing_sp[0].object_id
-  )
-  # Get the application client ID (from either new or existing)
-  application_client_id = (
-    local.conditional_create_application
-    ? azuread_application.integration[0].client_id
-    : var.azure_application_client_id
-  )
 
   # Resource group and region configuration.
   resource_group_name = (
@@ -161,6 +145,18 @@ locals {
   key_vault_secret_content_type = "text/plain"
 }
 
+module "app_registration" {
+  source = "../_shared/app-registration"
+
+  application_name_prefix                       = var.application_name_prefix
+  resource_suffix                               = var.resource_suffix
+  application_password_expiration_date          = var.application_password_expiration_date
+  application_owners                            = var.application_owners
+  azure_application_client_id                   = var.azure_application_client_id
+  azure_application_client_secret               = var.azure_application_client_secret
+  azure_application_service_principal_object_id = var.azure_application_service_principal_object_id
+}
+
 # Data source for existing resource group when using existing Event Hub or
 # when a specific resource group is provided.
 data "azurerm_resource_group" "existing" {
@@ -251,46 +247,17 @@ resource "azurerm_eventhub_namespace_authorization_rule" "new" {
   ]
 }
 
-# Azure AD application for integration.
-resource "azuread_application" "integration" {
-  count        = local.conditional_create_application ? 1 : 0
-  display_name = local.app_name
-  owners = coalescelist(
-    var.application_owners,
-    [data.azuread_client_config.current.object_id]
-  )
-  marketing_url = "https://www.upwind.io/"
-  web {
-    homepage_url = "https://www.upwind.io/"
-  }
-  # Long-lived password for the Azure AD application.
-  password {
-    end_date     = var.application_password_expiration_date
-    display_name = "${local.app_name}_client_secret"
-  }
-}
-
-# Service principal for the integration application.
-resource "azuread_service_principal" "integration" {
-  count     = local.conditional_create_application ? 1 : 0
-  client_id = azuread_application.integration[0].client_id
-  owners = coalescelist(
-    var.application_owners,
-    [data.azuread_client_config.current.object_id]
-  )
-}
-
 # Role assignment for Event Hub data receiver access.
 resource "azurerm_role_assignment" "eh_receiver" {
   role_definition_name = local.role_eventhub_data_receiver
-  principal_id         = local.service_principal_object_id
+  principal_id         = module.app_registration.service_principal_object_id
   scope                = local.eventhub_namespace_id
 }
 
 # Role assignment for monitoring reader access to subscription.
 resource "azurerm_role_assignment" "monitoring_reader" {
   role_definition_name = local.role_monitoring_reader
-  principal_id         = local.service_principal_object_id
+  principal_id         = module.app_registration.service_principal_object_id
   scope                = data.azurerm_subscription.current.id # infrastructure
 }
 
@@ -333,7 +300,7 @@ resource "azurerm_role_assignment" "kv_secrets_user" {
 # Key Vault secret for service principal client ID.
 resource "azurerm_key_vault_secret" "sp_client_id" {
   name            = var.key_vault_client_id_secret_name
-  value           = local.application_client_id
+  value           = module.app_registration.client_id
   key_vault_id    = azurerm_key_vault.integration.id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
@@ -348,11 +315,7 @@ resource "azurerm_key_vault_secret" "sp_client_id" {
 # Key Vault secret for service principal client secret.
 resource "azurerm_key_vault_secret" "sp_client_secret" {
   name = var.key_vault_client_secret_secret_name
-  value = (
-    local.conditional_create_application
-    ? [for p in azuread_application.integration[0].password : p.value][0]
-    : var.azure_application_client_secret
-  )
+  value = module.app_registration.client_secret
   key_vault_id    = azurerm_key_vault.integration.id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
