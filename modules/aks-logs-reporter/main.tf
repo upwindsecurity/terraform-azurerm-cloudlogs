@@ -12,25 +12,14 @@ locals {
   ])
   all_regions = toset(concat(tolist(local.detected_regions), var.regions))
 
+  # Suffix string with leading dash, or empty when no suffix is set.
+  name_suffix = var.resource_suffix != "" ? "-${var.resource_suffix}" : ""
+
   # Resource names with suffix applied.
-  app_name = format("%s-%s",
-    var.application_name_prefix,
-    var.resource_suffix,
-  )
-  eventhub_consumer_group_name = (
-    var.resource_suffix != ""
-    ? "${var.eventhub_consumer_group_name}-${var.resource_suffix}"
-    : var.eventhub_consumer_group_name
-  )
-  diagnostic_setting_name = (
-    var.resource_suffix != ""
-    ? "${var.diagnostic_setting_name}-${var.resource_suffix}"
-    : var.diagnostic_setting_name
-  )
-  key_vault_name = format("%s-%s",
-    var.key_vault_name,
-    var.resource_suffix,
-  )
+  app_name                     = "${var.application_name_prefix}${local.name_suffix}"
+  eventhub_consumer_group_name = "${var.eventhub_consumer_group_name}${local.name_suffix}"
+  diagnostic_setting_name      = "${var.diagnostic_setting_name}${local.name_suffix}"
+  key_vault_name               = "${var.key_vault_name}${local.name_suffix}"
 
   # Common tags for all Azure resources.
   common_tags = merge(
@@ -96,7 +85,7 @@ module "app_registration" {
 
 # Shared resource group for Key Vault and global resources.
 resource "azurerm_resource_group" "shared" {
-  name     = "${var.resource_group_name}-shared-${var.resource_suffix}"
+  name     = "${var.resource_group_name}-shared${local.name_suffix}"
   location = local.effective_key_vault_region
   tags     = local.common_tags
 
@@ -112,7 +101,7 @@ resource "azurerm_resource_group" "shared" {
 resource "azurerm_resource_group" "regions" {
   for_each = local.all_regions
 
-  name     = "${var.resource_group_name}-${each.key}-${var.resource_suffix}"
+  name     = "${var.resource_group_name}-${each.key}${local.name_suffix}"
   location = each.key
   tags     = local.common_tags
 }
@@ -121,7 +110,7 @@ resource "azurerm_resource_group" "regions" {
 resource "azurerm_eventhub_namespace" "regions" {
   for_each = local.all_regions
 
-  name                     = "${var.eventhub_namespace_name}-${each.key}-${var.resource_suffix}"
+  name                     = "${var.eventhub_namespace_name}-${each.key}${local.name_suffix}"
   location                 = each.key
   resource_group_name      = azurerm_resource_group.regions[each.key].name
   sku                      = var.eventhub_pricing_tier
@@ -134,7 +123,7 @@ resource "azurerm_eventhub_namespace" "regions" {
 resource "azurerm_eventhub" "regions" {
   for_each = local.all_regions
 
-  name              = "${var.eventhub_name}-${each.key}-${var.resource_suffix}"
+  name              = "${var.eventhub_name}-${each.key}${local.name_suffix}"
   namespace_id      = azurerm_eventhub_namespace.regions[each.key].id
   partition_count   = var.eventhub_partition_count
   message_retention = var.eventhub_message_retention_days
@@ -154,7 +143,7 @@ resource "azurerm_eventhub_consumer_group" "regions" {
 resource "azurerm_eventhub_namespace_authorization_rule" "regions" {
   for_each = local.all_regions
 
-  name                = "${var.eventhub_authorization_rule_name}-${each.key}-${var.resource_suffix}"
+  name                = "${var.eventhub_authorization_rule_name}-${each.key}${local.name_suffix}"
   namespace_name      = azurerm_eventhub_namespace.regions[each.key].name
   resource_group_name = azurerm_resource_group.regions[each.key].name
   listen              = true

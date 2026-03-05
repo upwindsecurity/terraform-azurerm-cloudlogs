@@ -1,7 +1,8 @@
 locals {
   create_application = var.azure_application_client_id == null
 
-  app_name = format("%s-%s", var.application_name_prefix, var.resource_suffix)
+  name_suffix = var.resource_suffix != "" ? "-${var.resource_suffix}" : ""
+  app_name    = "${var.application_name_prefix}${local.name_suffix}"
 
   client_id = (
     local.create_application
