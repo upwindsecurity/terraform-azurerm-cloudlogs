@@ -9,7 +9,7 @@ output "eventhub_consumer_group_name" {
 }
 
 output "application_name" {
-  description = "The display name of the Azure AD application. Null when using an existing application."
+  description = "The display name of the Azure AD application. Returns the existing client ID when using an existing application."
   value       = var.azure_application_client_id == null ? local.app_name : var.azure_application_client_id
 }
 
