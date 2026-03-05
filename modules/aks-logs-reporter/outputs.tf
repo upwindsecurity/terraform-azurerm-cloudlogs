@@ -1,25 +1,15 @@
-output "eventhub_name" {
-  description = "The name of the Event Hub used for Azure Monitor Logs monitoring."
-  value       = local.eventhub_name
-}
-
-output "eventhub_namespace_name" {
-  description = "The name of the Event Hub namespace used for Azure Monitor Logs monitoring."
-  value       = local.eventhub_namespace_name
+output "eventhub_by_region" {
+  description = "Map of region => Event Hub connection details for all deployed regions."
+  value       = local.eventhub_by_region
 }
 
 output "eventhub_consumer_group_name" {
-  description = "The name of the consumer group created for processing logs."
+  description = "The name of the consumer group created in each regional Event Hub."
   value       = local.eventhub_consumer_group_name
 }
 
-output "resource_group_name" {
-  description = "The name of the resource group where Event Hub resources are deployed."
-  value       = local.resource_group_name
-}
-
 output "application_name" {
-  description = "The display name of the Azure AD application."
+  description = "The display name of the Azure AD application. Returns the existing client ID when using an existing application."
   value       = var.azure_application_client_id == null ? local.app_name : var.azure_application_client_id
 }
 
@@ -39,4 +29,12 @@ output "key_vault_name" {
     principal secrets.
   EOT
   value       = local.key_vault_name
+}
+
+output "diagnostic_settings" {
+  description = "Map of AKS cluster IDs to their diagnostic setting resource IDs. Empty when create_diagnostic_settings is false."
+  value = {
+    for cluster_id, setting in azurerm_monitor_diagnostic_setting.aks :
+    cluster_id => setting.id
+  }
 }
