@@ -7,7 +7,7 @@
 
 ## Overview
 
-This repository contains the following Terraform modules for Microsoft Azure cloud logs.
+This repository contains Terraform modules for streaming Microsoft Azure cloud logs to Upwind via Azure Event Hubs.
 
 These modules automate the creation of
 [Azure Monitor diagnostic settings](https://learn.microsoft.com/en-us/azure/azure-monitor/platform/diagnostic-settings)
@@ -18,15 +18,25 @@ Diagnostic settings allow you to collect resource logs and send platform metrics
 
 ## Modules
 
+### Azure Monitor Logs (Activity & Entra ID Logs)
+
 - [modules/eventhub/](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/modules/eventhub/) -
-  Azure Monitor Logs via Event Hub
+  Stream Azure Monitor activity logs and Entra ID logs to Upwind via Event Hub
 - [modules/auto-discovery](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/modules/auto-discovery/)
-  \- Auto creating diagnostic settings on selected scope (inner module)
+  \- Auto-create diagnostic settings across a selected scope (inner module used by `eventhub`)
+
+### AKS Audit Logs
+
+- [modules/aks-logs-reporter/](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/modules/aks-logs-reporter/)
+  \- Stream AKS Kubernetes audit logs to Upwind via per-region Event Hubs. Creates one Event Hub stack per Azure
+  region (auto-detected from cluster locations or explicitly listed) and optionally configures AKS diagnostic settings.
 
 ## Examples
 
 Complete usage examples are available in the
 [examples](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/) directory:
+
+### Azure Monitor Logs examples
 
 - [eventhub-basic](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-basic/) -
   Simple subscription-based monitoring
@@ -38,6 +48,15 @@ Complete usage examples are available in the
   \- Tenant-wide monitoring with exclusions
 - [auto-discovery](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/auto-discovery-basic-usage/)
   \- Auto-Discovery Basic usage example
+
+### AKS Audit Logs examples
+
+- [aks-logs-reporter-basic](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/aks-logs-reporter-basic/)
+  \- Single cluster with auto-detected region and diagnostic settings
+- [aks-logs-reporter-regions](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/aks-logs-reporter-regions/)
+  \- Explicit regions without AKS cluster access
+- [aks-logs-reporter-multi-region](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/aks-logs-reporter-multi-region/)
+  \- Multiple clusters spread across several Azure regions
 
 ## Contributing
 

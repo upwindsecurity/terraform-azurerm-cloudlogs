@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.1.5](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.4...v1.1.5) (2026-03-05)
+
+### Features
+
+* **modules:** add aks-logs-reporter module for AKS audit log collection
+
+### Code Refactoring
+
+* **modules:** extract app registration into shared module
+
 ## [1.1.4](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.3...v1.1.4) (2025-12-21)
 
 ### Code Refactoring
