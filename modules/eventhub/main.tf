@@ -198,6 +198,10 @@ resource "azurerm_eventhub_namespace" "new" {
   auto_inflate_enabled     = var.eventhub_enable_auto_inflate
   maximum_throughput_units = var.eventhub_enable_auto_inflate ? var.eventhub_max_throughput_units : null
   tags                     = local.common_tags
+
+  lifecycle {
+    ignore_changes = [capacity]
+  }
 }
 
 # Data source for existing Event Hub when using existing Event Hub.
