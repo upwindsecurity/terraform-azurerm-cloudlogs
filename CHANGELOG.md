@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.1.5](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.4...v1.1.5) (2026-07-27)
+
+### Bug Fixes
+
+* ignore capacity drift on eventhub namespace ([#19](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/issues/19)) ([b7fd9a0](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/commit/b7fd9a0a121d483aff1c5c3995c165cac2d1dd9f))
+
 ## [1.1.4](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.3...v1.1.4) (2025-12-21)
 
 ### Code Refactoring
