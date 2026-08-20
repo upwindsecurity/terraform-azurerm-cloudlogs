@@ -85,7 +85,6 @@ resource "azurerm_policy_definition" "policy_definition" {
   metadata = jsonencode({
     category  = var.policy_category
     createdBy = var.created_by
-    createdOn = timestamp()
     updatedBy = null
     updatedOn = null
   })
@@ -119,7 +118,7 @@ resource "azurerm_role_assignment" "policy_builtin_roles" {
   for_each = toset(var.built_in_role_names)
 
   scope              = var.management_group_id
-  role_definition_id = data.azurerm_role_definition.built_in_role[each.value].role_definition_id
+  role_definition_id = data.azurerm_role_definition.built_in_role[each.value].id
   principal_id       = azurerm_management_group_policy_assignment.policy_assignment.identity[0].principal_id
 
   depends_on = [
