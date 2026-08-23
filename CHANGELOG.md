@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.1.6](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.5...v1.1.6) (2026-08-23)
+
+### Bug Fixes
+
+* **modules:** use scoped role definition ID for auto-discovery role assignments ([#21](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/issues/21)) ([82ac320](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/commit/82ac32032e36aee0618fbcd131870eae3ae45f1d))
+
 ## [1.1.5](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/compare/v1.1.4...v1.1.5) (2026-07-27)
 
 ### Bug Fixes
