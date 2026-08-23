@@ -85,6 +85,7 @@ resource "azurerm_policy_definition" "policy_definition" {
   metadata = jsonencode({
     category  = var.policy_category
     createdBy = var.created_by
+    createdOn = timestamp()
     updatedBy = null
     updatedOn = null
   })
