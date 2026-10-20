@@ -22,7 +22,7 @@ locals {
     "12345678-1234-1234-1234-123456789013", # Staging
   ]
 
-  # Onboarding service principal (needs Key Vault Secrets Officer access).
+  # Onboarding service principal (granted Azure Event Hubs Data Receiver on the namespace).
   onboarding_service_principal_client_id = "12345678-1234-1234-1234-5678"
 }
 

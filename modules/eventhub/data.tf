@@ -1,13 +1,11 @@
 # Get current Azure AD client configuration for resource setup.
 data "azuread_client_config" "current" {}
 
-# Get current Azure client configuration for service principal details.
-data "azurerm_client_config" "current_sp" {}
-
 # Get current subscription context to validate against `infrastructure_subscription_id`.
 data "azurerm_subscription" "current" {}
 
-# Get onboarding service principal details for Key Vault access.
+# Get onboarding service principal details. This is the identity Upwind already
+# holds credentials for; it is granted read access to the Event Hub directly.
 data "azuread_service_principal" "onboarding_sp" {
   client_id = var.onboarding_service_principal_client_id
 }
@@ -29,11 +27,4 @@ data "azurerm_subscriptions" "all" {
 data "azurerm_management_group" "streaming" {
   for_each = toset(var.stream_management_group_ids)
   name     = each.value
-}
-
-# Data source for existing service principal (when using existing app)
-# Skipped if a service principal object ID is provided
-data "azuread_service_principal" "existing_sp" {
-  count     = local.conditional_create_application || var.azure_application_service_principal_object_id != null ? 0 : 1
-  client_id = var.azure_application_client_id
 }

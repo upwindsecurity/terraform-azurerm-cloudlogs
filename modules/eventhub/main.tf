@@ -1,29 +1,16 @@
 # This module sets up Azure Monitor Logs monitoring with Upwind for
 # monitoring and processing Azure activity and Entra ID logs. It creates and
-# configures Event Hubs, diagnostic settings, service principals, and Key Vault
-# resources to handle Azure log events.
+# configures Event Hubs and diagnostic settings, and grants the Upwind
+# onboarding service principal read access to the Event Hub.
 
 # Local values for resource naming and configuration.
 locals {
   # Conditional creation flags.
   conditional_create_eventhub       = !var.use_existing_eventhub
   conditional_create_resource_group = !var.use_existing_eventhub && !var.use_existing_resource_group
-  conditional_create_application    = var.azure_application_client_id == null
 
-  # Get the service principal object ID (from either new or existing)
-  service_principal_object_id = (
-    local.conditional_create_application
-    ? azuread_service_principal.integration[0].object_id
-    : var.azure_application_service_principal_object_id != null
-    ? var.azure_application_service_principal_object_id
-    : data.azuread_service_principal.existing_sp[0].object_id
-  )
-  # Get the application client ID (from either new or existing)
-  application_client_id = (
-    local.conditional_create_application
-    ? azuread_application.integration[0].client_id
-    : var.azure_application_client_id
-  )
+  # The Upwind onboarding service principal consumes the Event Hub directly.
+  onboarding_service_principal_object_id = data.azuread_service_principal.onboarding_sp.object_id
 
   # Resource group and region configuration.
   resource_group_name = (
@@ -55,12 +42,6 @@ locals {
   )
 
   # Resource names with suffix applied.
-  app_name = (
-    format("%s-%s",
-      var.application_name_prefix,
-      var.resource_suffix,
-    )
-  )
   eventhub_consumer_group_name = (
     format("%s-%s",
       var.eventhub_consumer_group_name,
@@ -85,13 +66,6 @@ locals {
       var.resource_suffix,
     )
   )
-  key_vault_name = (
-    format("%s-%s",
-      var.key_vault_name,
-      var.resource_suffix,
-    )
-  )
-
   # Common tags for all Azure resources.
   common_tags = merge(
     {
@@ -121,10 +95,8 @@ locals {
   )
 
   # Azure RBAC role definitions required for the integration.
-  role_eventhub_data_receiver    = "Azure Event Hubs Data Receiver"
-  role_monitoring_reader         = "Monitoring Reader"
-  role_key_vault_secrets_officer = "Key Vault Secrets Officer"
-  role_key_vault_secret_user     = "Key Vault Secrets User"
+  role_eventhub_data_receiver = "Azure Event Hubs Data Receiver"
+  role_monitoring_reader      = "Monitoring Reader"
 
   # Extract subscription IDs from management groups.
   management_group_subscription_ids = flatten([
@@ -157,8 +129,6 @@ locals {
     : toset([var.infrastructure_subscription_id])
   )
 
-  # Key Vault secret configuration.
-  key_vault_secret_content_type = "text/plain"
 }
 
 # Data source for existing resource group when using existing Event Hub or
@@ -255,117 +225,18 @@ resource "azurerm_eventhub_namespace_authorization_rule" "new" {
   ]
 }
 
-# Azure AD application for integration.
-resource "azuread_application" "integration" {
-  count        = local.conditional_create_application ? 1 : 0
-  display_name = local.app_name
-  owners = coalescelist(
-    var.application_owners,
-    [data.azuread_client_config.current.object_id]
-  )
-  marketing_url = "https://www.upwind.io/"
-  web {
-    homepage_url = "https://www.upwind.io/"
-  }
-  # Long-lived password for the Azure AD application.
-  password {
-    end_date     = var.application_password_expiration_date
-    display_name = "${local.app_name}_client_secret"
-  }
-}
-
-# Service principal for the integration application.
-resource "azuread_service_principal" "integration" {
-  count     = local.conditional_create_application ? 1 : 0
-  client_id = azuread_application.integration[0].client_id
-  owners = coalescelist(
-    var.application_owners,
-    [data.azuread_client_config.current.object_id]
-  )
-}
-
 # Role assignment for Event Hub data receiver access.
 resource "azurerm_role_assignment" "eh_receiver" {
   role_definition_name = local.role_eventhub_data_receiver
-  principal_id         = local.service_principal_object_id
+  principal_id         = local.onboarding_service_principal_object_id
   scope                = local.eventhub_namespace_id
 }
 
 # Role assignment for monitoring reader access to subscription.
 resource "azurerm_role_assignment" "monitoring_reader" {
   role_definition_name = local.role_monitoring_reader
-  principal_id         = local.service_principal_object_id
+  principal_id         = local.onboarding_service_principal_object_id
   scope                = data.azurerm_subscription.current.id # infrastructure
-}
-
-# Key Vault for storing integration service principal secrets.
-resource "azurerm_key_vault" "integration" {
-  name                       = local.key_vault_name
-  location                   = local.region
-  resource_group_name        = local.resource_group_name
-  tenant_id                  = var.tenant_id
-  sku_name                   = var.key_vault_sku_name
-  purge_protection_enabled   = var.key_vault_purge_protection_enabled
-  rbac_authorization_enabled = var.key_vault_rbac_authorization_enabled
-  tags                       = local.common_tags
-
-  dynamic "network_acls" {
-    for_each = var.key_vault_network_acls_enabled ? [1] : []
-    content {
-      default_action             = var.key_vault_network_acls_default_action
-      bypass                     = var.key_vault_network_acls_bypass
-      ip_rules                   = var.key_vault_network_acls_ip_rules
-      virtual_network_subnet_ids = var.key_vault_network_acls_virtual_network_subnet_ids
-    }
-  }
-}
-
-# Role assignments for Key Vault secrets officer access for current service principal .
-resource "azurerm_role_assignment" "kv_secrets_officer" {
-  role_definition_name = local.role_key_vault_secrets_officer
-  principal_id         = data.azurerm_client_config.current_sp.object_id
-  scope                = azurerm_key_vault.integration.id
-}
-
-# Role assignments for Key Vault secrets User access for current onboarding service principal .
-resource "azurerm_role_assignment" "kv_secrets_user" {
-  role_definition_name = local.role_key_vault_secret_user
-  principal_id         = data.azuread_service_principal.onboarding_sp.object_id
-  scope                = azurerm_key_vault.integration.id
-}
-
-# Key Vault secret for service principal client ID.
-resource "azurerm_key_vault_secret" "sp_client_id" {
-  name            = var.key_vault_client_id_secret_name
-  value           = local.application_client_id
-  key_vault_id    = azurerm_key_vault.integration.id
-  content_type    = local.key_vault_secret_content_type
-  expiration_date = var.key_vault_secret_expiration_date
-  tags            = local.common_tags
-
-  depends_on = [
-    azurerm_role_assignment.kv_secrets_officer,
-    azurerm_role_assignment.kv_secrets_user,
-  ]
-}
-
-# Key Vault secret for service principal client secret.
-resource "azurerm_key_vault_secret" "sp_client_secret" {
-  name = var.key_vault_client_secret_secret_name
-  value = (
-    local.conditional_create_application
-    ? [for p in azuread_application.integration[0].password : p.value][0]
-    : var.azure_application_client_secret
-  )
-  key_vault_id    = azurerm_key_vault.integration.id
-  content_type    = local.key_vault_secret_content_type
-  expiration_date = var.key_vault_secret_expiration_date
-  tags            = local.common_tags
-
-  depends_on = [
-    azurerm_role_assignment.kv_secrets_officer,
-    azurerm_role_assignment.kv_secrets_user
-  ]
 }
 
 # Create diagnostic settings for activity logs to stream to Event Hub.
