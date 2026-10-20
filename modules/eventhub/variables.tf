@@ -7,9 +7,9 @@ variable "tenant_id" {
 
 variable "infrastructure_subscription_id" {
   description = <<-EOT
-    The subscription ID where the infrastructure resources (Event Hub, Key
-    Vault, Service Principal, etc.) will be deployed or already exist. This
-    must match the subscription context of your authenticated Azure provider.
+    The subscription ID where the infrastructure resources (Event Hub and
+    related resources) will be deployed or already exist. This must match the
+    subscription context of your authenticated Azure provider.
   EOT
   type        = string
 
@@ -27,78 +27,15 @@ variable "infrastructure_subscription_id" {
 
 variable "onboarding_service_principal_client_id" {
   description = <<-EOT
-    The client ID of the Upwind onboarding service principal. This service
-    principal will be granted Key Vault Secrets Officer access to manage
-    the integration service principal secrets.
+    The client ID of the Upwind onboarding service principal. Upwind already
+    holds credentials for this principal; it is granted Azure Event Hubs Data
+    Receiver on the Event Hub namespace and Monitoring Reader on the
+    infrastructure subscription so it can consume the log stream.
   EOT
   type        = string
 }
 
 # endregion azure_integration_scope
-
-# region azure_ad_application
-
-variable "application_name_prefix" {
-  description = "The Upwind AD application display name prefix."
-  type        = string
-  default     = "upwindsecurity-cloudlogs"
-}
-
-variable "application_owners" {
-  description = <<-EOT
-    List of user IDs that will be set as owners of the Azure application &
-    service principal. Each ID should be in the form of a GUID. If this list
-    is left empty, the owner defaults to the authenticated principal.
-  EOT
-  type        = list(string)
-  default     = []
-}
-
-variable "application_password_expiration_date" {
-  description = <<-EOT
-    The expiration date for the Azure AD application password in RFC3339 format
-    (e.g., `2999-12-31T23:59:59Z`). This determines when the application
-    password expires.
-  EOT
-  type        = string
-  default     = "2999-12-31T23:59:59Z"
-
-  validation {
-    condition     = can(timecmp(var.application_password_expiration_date, "1970-01-01T00:00:00Z"))
-    error_message = "The expiration date must be in RFC3339 format (e.g., `2999-12-31T23:59:59Z`)."
-  }
-}
-
-variable "azure_application_client_id" {
-  description = "Optional client ID of an existing Azure AD application. If provided, the module will use this existing application instead of creating a new one. Mutually exclusive with application_name_prefix."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.azure_application_client_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.azure_application_client_id))
-    error_message = "The azure_application_client_id must be a valid GUID format."
-  }
-}
-
-variable "azure_application_client_secret" {
-  description = "Client secret for the existing Azure AD application. Required when azure_application_client_id is provided and organizational credentials will be created. Should be managed externally (e.g., Azure Portal, CLI, or separate automation)."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "azure_application_service_principal_object_id" {
-  description = "The service principal object ID of the existing Azure AD application. Optional, if provided the module will skip looking up the service principal object ID. Should be managed externally (e.g., Azure Portal, CLI, or separate automation)."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.azure_application_service_principal_object_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.azure_application_service_principal_object_id))
-    error_message = "The azure_application_service_principal_object_id must be a valid GUID format."
-  }
-}
-
-# endregion azure_ad_application
 
 # region eventhub_configuration
 
@@ -331,123 +268,6 @@ variable "enable_auto_discovery" {
 }
 
 # endregion streaming_scope
-
-# region key_vault
-
-variable "key_vault_name" {
-  description = <<-EOT
-    The name of the Key Vault used to store integration service principal
-    secrets and credentials.
-  EOT
-  type        = string
-  default     = "upwindsecurity"
-}
-
-variable "key_vault_sku_name" {
-  description = "The SKU name of the Key Vault."
-  type        = string
-  default     = "standard"
-}
-
-variable "key_vault_purge_protection_enabled" {
-  description = "Whether to enable purge protection for the Key Vault."
-  type        = bool
-  default     = true
-}
-
-variable "key_vault_rbac_authorization_enabled" {
-  description = "Whether to enable RBAC authorization for the Key Vault."
-  type        = bool
-  default     = true
-}
-
-variable "key_vault_client_id_secret_name" {
-  description = "The name of the Key Vault secret for service principal client ID."
-  type        = string
-  default     = "sp-client-id"
-}
-
-variable "key_vault_client_secret_secret_name" {
-  description = <<-EOT
-    The name of the Key Vault secret for service principal client secret.
-  EOT
-  type        = string
-  default     = "sp-client-secret"
-}
-
-variable "key_vault_network_acls_enabled" {
-  description = <<-EOT
-    Whether to enable network ACLs for the Key Vault. When enabled, network
-    access rules will be applied based on the other network ACL variables.
-  EOT
-  type        = bool
-  default     = false
-}
-
-variable "key_vault_network_acls_default_action" {
-  description = <<-EOT
-    The default action to use when no rules match from `ip_rules` / `virtual_network_subnet_ids`.
-    Possible values are `Allow` and `Deny`. Only used when `key_vault_network_acls_enabled` is `true`.
-  EOT
-  type        = string
-  default     = "Deny"
-
-  validation {
-    condition     = contains(["Allow", "Deny"], var.key_vault_network_acls_default_action)
-    error_message = "The default action must be either `Allow` or `Deny`."
-  }
-}
-
-variable "key_vault_network_acls_bypass" {
-  description = <<-EOT
-    Specifies which traffic can bypass the network rules. Possible values are
-    `AzureServices` and `None`. Only used when `key_vault_network_acls_enabled` is `true`.
-  EOT
-  type        = string
-  default     = "AzureServices"
-
-  validation {
-    condition     = contains(["AzureServices", "None"], var.key_vault_network_acls_bypass)
-    error_message = "The bypass value must be either `AzureServices` or `None`."
-  }
-}
-
-variable "key_vault_network_acls_ip_rules" {
-  description = <<-EOT
-    One or more IP addresses or CIDR blocks which should be able to access
-    the Key Vault. Only used when `key_vault_network_acls_enabled` is `true`.
-  EOT
-  type        = list(string)
-  default     = []
-}
-
-variable "key_vault_network_acls_virtual_network_subnet_ids" {
-  description = <<-EOT
-    One or more subnet IDs which should be able to access this Key Vault.
-    Only used when `key_vault_network_acls_enabled` is `true`.
-  EOT
-  type        = list(string)
-  default     = []
-}
-
-variable "key_vault_secret_expiration_date" {
-  description = <<-EOT
-    The expiration date for the Key Vault secrets in RFC3339 format
-    (e.g., `2025-12-31T23:59:59Z`). If not specified, secrets will not expire.
-  EOT
-  type        = string
-  default     = null
-
-  validation {
-    condition = (
-      var.key_vault_secret_expiration_date == null ||
-      can(timecmp(var.key_vault_secret_expiration_date, "1970-01-01T00:00:00Z"))
-    )
-    error_message = "The expiration date must be in RFC3339 format (e.g., `2025-12-31T23:59:59Z`) or null."
-  }
-}
-
-# endregion key_vault
 
 # region general_configuration
 
