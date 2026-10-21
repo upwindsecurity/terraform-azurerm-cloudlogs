@@ -28,13 +28,76 @@ variable "infrastructure_subscription_id" {
 variable "onboarding_service_principal_client_id" {
   description = <<-EOT
     The client ID of the Upwind onboarding service principal. This service
-    principal will be granted Key Vault Secrets Officer access to manage
-    the integration service principal secrets.
+    principal will be granted Key Vault Secrets User access to read the
+    integration service principal secrets. Required in the legacy
+    client-secret flow; ignored (and not needed) in the secretless WIF flow.
   EOT
   type        = string
+  default     = null
 }
 
 # endregion azure_integration_scope
+
+# region workload_identity_federation
+
+variable "use_workload_identity_federation" {
+  description = <<-EOT
+    Authenticate Upwind to the Event Hub via workload identity federation
+    (WIF) instead of a client secret, mirroring the WIF flow of
+    terraform-azurerm-onboarding. When true (the default), the module uses
+    WIF ONLY IF a WIF identity is available - i.e. `fetcher_app_client_id` or
+    `fetcher_app_service_principal_object_id` is set, which happens when the
+    org has azure-auth-service enabled and the Upwind console has surfaced
+    the Fetcher (WIF) app. In WIF mode no app registration, client secret or
+    Key Vault is created in this tenant; instead the service principal of the
+    org's Upwind-minted multi-tenant WIF app registration is materialized
+    here and granted `Azure Event Hubs Data Receiver` on the namespace and
+    `Monitoring Reader` on the infrastructure subscription. AUTO-FALLBACK:
+    if no `fetcher_*` input is provided, the module keeps the legacy
+    client-secret flow (app registration + Key Vault) so existing
+    deployments are unaffected. Set false to pin the legacy flow explicitly.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "fetcher_app_client_id" {
+  description = <<-EOT
+    Client ID of the org's Upwind-minted multi-tenant Fetcher (WIF) app
+    registration, shown in the Upwind console after adding the Azure
+    organization. Its service principal is materialized in this tenant and
+    granted Event Hub read access. Required in WIF mode unless
+    `fetcher_app_service_principal_object_id` is provided.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.fetcher_app_client_id == "" || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.fetcher_app_client_id))
+    error_message = "The fetcher_app_client_id must be a valid GUID format."
+  }
+}
+
+variable "fetcher_app_service_principal_object_id" {
+  description = <<-EOT
+    WIF mode (optional): object ID of an existing service principal for the
+    org's Fetcher (WIF) app registration in this tenant. Provide this when
+    the SP has already been created out-of-band (e.g. admin consent /
+    `az ad sp create --id <fetcher_app_client_id>`) and the Terraform runner
+    lacks Microsoft Graph permissions to create it. When set, the module
+    skips creating the service principal and assigns roles to this object
+    ID directly; `fetcher_app_client_id` is then not required.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.fetcher_app_service_principal_object_id == "" || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.fetcher_app_service_principal_object_id))
+    error_message = "The fetcher_app_service_principal_object_id must be a valid GUID format."
+  }
+}
+
+# endregion workload_identity_federation
 
 # region azure_ad_application
 
@@ -337,7 +400,8 @@ variable "enable_auto_discovery" {
 variable "key_vault_name" {
   description = <<-EOT
     The name of the Key Vault used to store integration service principal
-    secrets and credentials.
+    secrets and credentials. Legacy client-secret flow only; no Key Vault
+    is created in WIF mode.
   EOT
   type        = string
   default     = "upwindsecurity"

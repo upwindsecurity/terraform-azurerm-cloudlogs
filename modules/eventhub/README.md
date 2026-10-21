@@ -6,7 +6,38 @@ with existing Event Hub setups.
 
 ## Usage
 
-### Basic Usage
+### Secretless Usage (Workload Identity Federation)
+
+Mirrors the WIF flow of
+[terraform-azurerm-onboarding](https://github.com/upwindsecurity/terraform-azurerm-onboarding): no app registration,
+client secret or Key Vault is created in your tenant. The module materializes the consented service principal of your
+organization's Upwind-minted WIF app registration (`fetcher_app_client_id`, shown in the Upwind console) and grants it
+`Azure Event Hubs Data Receiver` on the Event Hub namespace. WIF is the default and engages as soon as a `fetcher_*`
+input is supplied; without one the module falls back to the legacy client-secret flow below.
+
+```hcl
+module "upwind_azure_cloudlogs" {
+  source = "upwindsecurity/cloudlogs/azurerm//modules/eventhub"
+
+  # Azure configuration
+  tenant_id                      = "12345678-1234-1234-1234-123456789012"
+  infrastructure_subscription_id = "87654321-4321-4321-4321-210987654321"
+
+  # Stream from specific subscriptions
+  stream_subscription_ids = ["87654321-4321-4321-4321-210987654321"]
+
+  # Workload identity federation: the org's Upwind-minted WIF app registration.
+  # If the Terraform runner lacks Microsoft Graph permissions, pre-consent it
+  # (`az ad sp create --id <fetcher_app_client_id>`) and pass
+  # fetcher_app_service_principal_object_id instead.
+  fetcher_app_client_id = "33333333-3333-3333-3333-333333333333"
+
+  # Entra ID logs are optional
+  diagnostic_setting_enable_entra_logs = false
+}
+```
+
+### Basic Usage (legacy client secret)
 
 ```hcl
 module "upwind_azure_cloudlogs" {
@@ -122,6 +153,7 @@ The executing principal needs the following permissions:
 - **Management Group level** (if using management groups): Reader access to management groups
 
 <!-- BEGIN_TF_DOCS -->
+
 ## Requirements
 
 | Name | Version |
@@ -149,6 +181,7 @@ The executing principal needs the following permissions:
 |------|------|
 | [azuread_application.integration](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application) | resource |
 | [azuread_service_principal.integration](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal) | resource |
+| [azuread_service_principal.wif](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal) | resource |
 | [azurerm_eventhub.new](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/eventhub) | resource |
 | [azurerm_eventhub_consumer_group.integration](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/eventhub_consumer_group) | resource |
 | [azurerm_eventhub_namespace.new](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/eventhub_namespace) | resource |
@@ -163,7 +196,6 @@ The executing principal needs the following permissions:
 | [azurerm_role_assignment.kv_secrets_officer](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.kv_secrets_user](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.monitoring_reader](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
-| [azuread_client_config.current](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/client_config) | data source |
 | [azuread_service_principal.existing_sp](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/service_principal) | data source |
 | [azuread_service_principal.onboarding_sp](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/service_principal) | data source |
 | [azurerm_client_config.current_sp](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
@@ -199,10 +231,12 @@ The executing principal needs the following permissions:
 | <a name="input_eventhub_namespace_name"></a> [eventhub\_namespace\_name](#input\_eventhub\_namespace\_name) | The name of the Event Hub namespace to be created or the existing one. | `string` | `"upwindsecurity"` | no |
 | <a name="input_eventhub_partition_count"></a> [eventhub\_partition\_count](#input\_eventhub\_partition\_count) | The number of partitions of the Event Hub. | `number` | `4` | no |
 | <a name="input_eventhub_pricing_tier"></a> [eventhub\_pricing\_tier](#input\_eventhub\_pricing\_tier) | The pricing tier of the Event Hub Namespace. | `string` | `"Standard"` | no |
+| <a name="input_fetcher_app_client_id"></a> [fetcher\_app\_client\_id](#input\_fetcher\_app\_client\_id) | Client ID of the org's Upwind-minted multi-tenant Fetcher (WIF) app<br/>registration, shown in the Upwind console after adding the Azure<br/>organization. Its service principal is materialized in this tenant and<br/>granted Event Hub read access. Required in WIF mode unless<br/>`fetcher_app_service_principal_object_id` is provided. | `string` | `""` | no |
+| <a name="input_fetcher_app_service_principal_object_id"></a> [fetcher\_app\_service\_principal\_object\_id](#input\_fetcher\_app\_service\_principal\_object\_id) | WIF mode (optional): object ID of an existing service principal for the<br/>org's Fetcher (WIF) app registration in this tenant. Provide this when<br/>the SP has already been created out-of-band (e.g. admin consent /<br/>`az ad sp create --id <fetcher_app_client_id>`) and the Terraform runner<br/>lacks Microsoft Graph permissions to create it. When set, the module<br/>skips creating the service principal and assigns roles to this object<br/>ID directly; `fetcher_app_client_id` is then not required. | `string` | `""` | no |
 | <a name="input_infrastructure_subscription_id"></a> [infrastructure\_subscription\_id](#input\_infrastructure\_subscription\_id) | The subscription ID where the infrastructure resources (Event Hub, Key<br/>Vault, Service Principal, etc.) will be deployed or already exist. This<br/>must match the subscription context of your authenticated Azure provider. | `string` | n/a | yes |
 | <a name="input_key_vault_client_id_secret_name"></a> [key\_vault\_client\_id\_secret\_name](#input\_key\_vault\_client\_id\_secret\_name) | The name of the Key Vault secret for service principal client ID. | `string` | `"sp-client-id"` | no |
 | <a name="input_key_vault_client_secret_secret_name"></a> [key\_vault\_client\_secret\_secret\_name](#input\_key\_vault\_client\_secret\_secret\_name) | The name of the Key Vault secret for service principal client secret. | `string` | `"sp-client-secret"` | no |
-| <a name="input_key_vault_name"></a> [key\_vault\_name](#input\_key\_vault\_name) | The name of the Key Vault used to store integration service principal<br/>secrets and credentials. | `string` | `"upwindsecurity"` | no |
+| <a name="input_key_vault_name"></a> [key\_vault\_name](#input\_key\_vault\_name) | The name of the Key Vault used to store integration service principal<br/>secrets and credentials. Legacy client-secret flow only; no Key Vault<br/>is created in WIF mode. | `string` | `"upwindsecurity"` | no |
 | <a name="input_key_vault_network_acls_bypass"></a> [key\_vault\_network\_acls\_bypass](#input\_key\_vault\_network\_acls\_bypass) | Specifies which traffic can bypass the network rules. Possible values are<br/>`AzureServices` and `None`. Only used when `key_vault_network_acls_enabled` is `true`. | `string` | `"AzureServices"` | no |
 | <a name="input_key_vault_network_acls_default_action"></a> [key\_vault\_network\_acls\_default\_action](#input\_key\_vault\_network\_acls\_default\_action) | The default action to use when no rules match from `ip_rules` / `virtual_network_subnet_ids`.<br/>Possible values are `Allow` and `Deny`. Only used when `key_vault_network_acls_enabled` is `true`. | `string` | `"Deny"` | no |
 | <a name="input_key_vault_network_acls_enabled"></a> [key\_vault\_network\_acls\_enabled](#input\_key\_vault\_network\_acls\_enabled) | Whether to enable network ACLs for the Key Vault. When enabled, network<br/>access rules will be applied based on the other network ACL variables. | `bool` | `false` | no |
@@ -212,7 +246,7 @@ The executing principal needs the following permissions:
 | <a name="input_key_vault_rbac_authorization_enabled"></a> [key\_vault\_rbac\_authorization\_enabled](#input\_key\_vault\_rbac\_authorization\_enabled) | Whether to enable RBAC authorization for the Key Vault. | `bool` | `true` | no |
 | <a name="input_key_vault_secret_expiration_date"></a> [key\_vault\_secret\_expiration\_date](#input\_key\_vault\_secret\_expiration\_date) | The expiration date for the Key Vault secrets in RFC3339 format<br/>(e.g., `2025-12-31T23:59:59Z`). If not specified, secrets will not expire. | `string` | `null` | no |
 | <a name="input_key_vault_sku_name"></a> [key\_vault\_sku\_name](#input\_key\_vault\_sku\_name) | The SKU name of the Key Vault. | `string` | `"standard"` | no |
-| <a name="input_onboarding_service_principal_client_id"></a> [onboarding\_service\_principal\_client\_id](#input\_onboarding\_service\_principal\_client\_id) | The client ID of the Upwind onboarding service principal. This service<br/>principal will be granted Key Vault Secrets Officer access to manage<br/>the integration service principal secrets. | `string` | n/a | yes |
+| <a name="input_onboarding_service_principal_client_id"></a> [onboarding\_service\_principal\_client\_id](#input\_onboarding\_service\_principal\_client\_id) | The client ID of the Upwind onboarding service principal. This service<br/>principal will be granted Key Vault Secrets User access to read the<br/>integration service principal secrets. Required in the legacy<br/>client-secret flow; ignored (and not needed) in the secretless WIF flow. | `string` | `null` | no |
 | <a name="input_region"></a> [region](#input\_region) | The region where the integration resources will be created or the existing<br/>Event Hub. | `string` | `"eastus"` | no |
 | <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name) | The name of the existing resource group for the Event Hub. | `string` | `"upwindsecurity"` | no |
 | <a name="input_resource_suffix"></a> [resource\_suffix](#input\_resource\_suffix) | The suffix to append to all resources created by this module. | `string` | `""` | no |
@@ -224,17 +258,19 @@ The executing principal needs the following permissions:
 | <a name="input_tenant_id"></a> [tenant\_id](#input\_tenant\_id) | The Azure Tenant that will be onboarded to the Upwind Azure Monitor Logs monitoring. | `string` | n/a | yes |
 | <a name="input_use_existing_eventhub"></a> [use\_existing\_eventhub](#input\_use\_existing\_eventhub) | Whether to use an existing Event Hub. If false, create a new one. | `bool` | `false` | no |
 | <a name="input_use_existing_resource_group"></a> [use\_existing\_resource\_group](#input\_use\_existing\_resource\_group) | Whether to use an existing resource group. If false, create a new one. | `bool` | `false` | no |
+| <a name="input_use_workload_identity_federation"></a> [use\_workload\_identity\_federation](#input\_use\_workload\_identity\_federation) | Authenticate Upwind to the Event Hub via workload identity federation<br/>(WIF) instead of a client secret, mirroring the WIF flow of<br/>terraform-azurerm-onboarding. When true (the default), the module uses<br/>WIF ONLY IF a WIF identity is available - i.e. `fetcher_app_client_id` or<br/>`fetcher_app_service_principal_object_id` is set, which happens when the<br/>org has azure-auth-service enabled and the Upwind console has surfaced<br/>the Fetcher (WIF) app. In WIF mode no app registration, client secret or<br/>Key Vault is created in this tenant; instead the service principal of the<br/>org's Upwind-minted multi-tenant WIF app registration is materialized<br/>here and granted `Azure Event Hubs Data Receiver` on the namespace and<br/>`Monitoring Reader` on the infrastructure subscription. AUTO-FALLBACK:<br/>if no `fetcher_*` input is provided, the module keeps the legacy<br/>client-secret flow (app registration + Key Vault) so existing<br/>deployments are unaffected. Set false to pin the legacy flow explicitly. | `bool` | `true` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_application_client_id"></a> [application\_client\_id](#output\_application\_client\_id) | The client ID of the Azure AD application. |
-| <a name="output_application_name"></a> [application\_name](#output\_application\_name) | The display name of the Azure AD application. |
+| <a name="output_application_client_id"></a> [application\_client\_id](#output\_application\_client\_id) | The client ID of the Azure AD application. In WIF mode this is the org's Upwind-minted WIF app registration (null when only fetcher\_app\_service\_principal\_object\_id was supplied). |
+| <a name="output_application_name"></a> [application\_name](#output\_application\_name) | The display name of the Azure AD application. Null in WIF mode (the app registration lives in Upwind's tenant, not this one). |
 | <a name="output_eventhub_consumer_group_name"></a> [eventhub\_consumer\_group\_name](#output\_eventhub\_consumer\_group\_name) | The name of the consumer group created for processing logs. |
 | <a name="output_eventhub_name"></a> [eventhub\_name](#output\_eventhub\_name) | The name of the Event Hub used for Azure Monitor Logs monitoring. |
 | <a name="output_eventhub_namespace_name"></a> [eventhub\_namespace\_name](#output\_eventhub\_namespace\_name) | The name of the Event Hub namespace used for Azure Monitor Logs monitoring. |
-| <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | The name of the Azure Key Vault that contains the integration service<br/>principal secrets. |
+| <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | The name of the Azure Key Vault that contains the integration service<br/>principal secrets. Null in WIF mode (no Key Vault is created). |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | The name of the resource group where Event Hub resources are deployed. |
 | <a name="output_service_principal_object_id"></a> [service\_principal\_object\_id](#output\_service\_principal\_object\_id) | The object ID of the integration service principal. |
+| <a name="output_workload_identity_federation_enabled"></a> [workload\_identity\_federation\_enabled](#output\_workload\_identity\_federation\_enabled) | Whether the secretless WIF flow was used (no app registration, client secret or Key Vault created in this tenant). |
 <!-- END_TF_DOCS -->

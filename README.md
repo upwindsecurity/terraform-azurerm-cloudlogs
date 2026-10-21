@@ -28,6 +28,8 @@ Diagnostic settings allow you to collect resource logs and send platform metrics
 Complete usage examples are available in the
 [examples](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/) directory:
 
+- [eventhub-wif](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-wif/) -
+  Secretless monitoring via workload identity federation (no app registration, secret or Key Vault)
 - [eventhub-basic](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-basic/) -
   Simple subscription-based monitoring
 - [eventhub-management-groups](https://github.com/upwindsecurity/terraform-azurerm-cloudlogs/tree/main/examples/eventhub-management-groups/)

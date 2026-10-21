@@ -2,25 +2,54 @@
 # monitoring and processing Azure activity and Entra ID logs. It creates and
 # configures Event Hubs, diagnostic settings, service principals, and Key Vault
 # resources to handle Azure log events.
+#
+# Two authentication flows are supported, mirroring terraform-azurerm-onboarding:
+#   * WIF (secretless, default when a fetcher_* input is supplied): the service
+#     principal of the org's Upwind-minted multi-tenant WIF app registration is
+#     materialized in this tenant and granted Event Hubs Data Receiver. No app
+#     registration, client secret or Key Vault is created here.
+#   * Legacy client secret (auto-fallback when no fetcher_* input is supplied):
+#     an app registration + password are created, stored in a Key Vault, and
+#     the Upwind onboarding service principal is granted read access to it.
 
 # Local values for resource naming and configuration.
 locals {
+  # WIF requires a Fetcher (WIF) identity, which exists only when azure-auth-service
+  # is enabled on the Upwind side and the console has surfaced fetcher_app_client_id /
+  # fetcher_app_service_principal_object_id. The presence of either input is the
+  # signal that the org is WIF-capable (same contract as terraform-azurerm-onboarding).
+  wif_available = var.fetcher_app_client_id != "" || var.fetcher_app_service_principal_object_id != ""
+
+  # Secretless WIF flow: engages only when enabled AND a WIF identity is available.
+  # Absent the fetcher_* inputs the module auto-falls-back to the legacy
+  # client-secret flow, so existing deployments are unaffected.
+  wif_enabled      = var.use_workload_identity_federation && local.wif_available
+  create_wif_sp    = local.wif_enabled && var.fetcher_app_service_principal_object_id == ""
+  wif_sp_object_id = var.fetcher_app_service_principal_object_id != "" ? var.fetcher_app_service_principal_object_id : one(azuread_service_principal.wif[*].object_id)
+
   # Conditional creation flags.
   conditional_create_eventhub       = !var.use_existing_eventhub
   conditional_create_resource_group = !var.use_existing_eventhub && !var.use_existing_resource_group
-  conditional_create_application    = var.azure_application_client_id == null
+  conditional_create_application    = var.azure_application_client_id == null && !local.wif_enabled
+  # The Key Vault only exists to hand a client secret to Upwind; WIF has none.
+  conditional_create_key_vault = !local.wif_enabled
 
-  # Get the service principal object ID (from either new or existing)
+  # Get the service principal object ID (WIF SP, or from either new or existing app)
   service_principal_object_id = (
-    local.conditional_create_application
+    local.wif_enabled
+    ? local.wif_sp_object_id
+    : local.conditional_create_application
     ? azuread_service_principal.integration[0].object_id
     : var.azure_application_service_principal_object_id != null
     ? var.azure_application_service_principal_object_id
     : data.azuread_service_principal.existing_sp[0].object_id
   )
-  # Get the application client ID (from either new or existing)
+  # Get the application client ID (WIF app reg, or from either new or existing app).
+  # Null in WIF mode when only fetcher_app_service_principal_object_id was supplied.
   application_client_id = (
-    local.conditional_create_application
+    local.wif_enabled
+    ? (var.fetcher_app_client_id != "" ? var.fetcher_app_client_id : null)
+    : local.conditional_create_application
     ? azuread_application.integration[0].client_id
     : var.azure_application_client_id
   )
@@ -261,7 +290,7 @@ resource "azuread_application" "integration" {
   display_name = local.app_name
   owners = coalescelist(
     var.application_owners,
-    [data.azuread_client_config.current.object_id]
+    [data.azurerm_client_config.current_sp.object_id]
   )
   marketing_url = "https://www.upwind.io/"
   web {
@@ -280,8 +309,28 @@ resource "azuread_service_principal" "integration" {
   client_id = azuread_application.integration[0].client_id
   owners = coalescelist(
     var.application_owners,
-    [data.azuread_client_config.current.object_id]
+    [data.azurerm_client_config.current_sp.object_id]
   )
+}
+
+# WIF mode: materialize the consented service principal for the org's
+# Upwind-minted WIF app registration (skipped when
+# fetcher_app_service_principal_object_id is supplied, e.g. when the Terraform
+# runner lacks Microsoft Graph permissions and the SP was pre-consented with
+# `az ad sp create --id <fetcher_app_client_id>`). The app registration itself
+# lives in Upwind's tenant, carrying the federated credential; this tenant only
+# trusts its SP.
+resource "azuread_service_principal" "wif" {
+  count        = local.create_wif_sp ? 1 : 0
+  client_id    = var.fetcher_app_client_id
+  use_existing = true
+
+  lifecycle {
+    precondition {
+      condition     = var.fetcher_app_client_id != ""
+      error_message = "use_workload_identity_federation requires fetcher_app_client_id (to create the SP) or fetcher_app_service_principal_object_id (to use an existing one). Both are available in the Upwind console after adding the Azure organization; alternatively set use_workload_identity_federation = false for the legacy client-secret flow."
+    }
+  }
 }
 
 # Role assignment for Event Hub data receiver access.
@@ -299,7 +348,10 @@ resource "azurerm_role_assignment" "monitoring_reader" {
 }
 
 # Key Vault for storing integration service principal secrets.
+# Legacy client-secret flow only - not created in WIF mode.
 resource "azurerm_key_vault" "integration" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   name                       = local.key_vault_name
   location                   = local.region
   resource_group_name        = local.resource_group_name
@@ -322,23 +374,29 @@ resource "azurerm_key_vault" "integration" {
 
 # Role assignments for Key Vault secrets officer access for current service principal .
 resource "azurerm_role_assignment" "kv_secrets_officer" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   role_definition_name = local.role_key_vault_secrets_officer
   principal_id         = data.azurerm_client_config.current_sp.object_id
-  scope                = azurerm_key_vault.integration.id
+  scope                = azurerm_key_vault.integration[0].id
 }
 
 # Role assignments for Key Vault secrets User access for current onboarding service principal .
 resource "azurerm_role_assignment" "kv_secrets_user" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   role_definition_name = local.role_key_vault_secret_user
-  principal_id         = data.azuread_service_principal.onboarding_sp.object_id
-  scope                = azurerm_key_vault.integration.id
+  principal_id         = data.azuread_service_principal.onboarding_sp[0].object_id
+  scope                = azurerm_key_vault.integration[0].id
 }
 
 # Key Vault secret for service principal client ID.
 resource "azurerm_key_vault_secret" "sp_client_id" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   name            = var.key_vault_client_id_secret_name
   value           = local.application_client_id
-  key_vault_id    = azurerm_key_vault.integration.id
+  key_vault_id    = azurerm_key_vault.integration[0].id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
   tags            = local.common_tags
@@ -351,13 +409,15 @@ resource "azurerm_key_vault_secret" "sp_client_id" {
 
 # Key Vault secret for service principal client secret.
 resource "azurerm_key_vault_secret" "sp_client_secret" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   name = var.key_vault_client_secret_secret_name
   value = (
     local.conditional_create_application
     ? [for p in azuread_application.integration[0].password : p.value][0]
     : var.azure_application_client_secret
   )
-  key_vault_id    = azurerm_key_vault.integration.id
+  key_vault_id    = azurerm_key_vault.integration[0].id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
   tags            = local.common_tags
@@ -366,6 +426,34 @@ resource "azurerm_key_vault_secret" "sp_client_secret" {
     azurerm_role_assignment.kv_secrets_officer,
     azurerm_role_assignment.kv_secrets_user
   ]
+}
+
+# The Key Vault resources became conditional (count) with the WIF flow. These
+# moved blocks keep existing legacy deployments in place instead of
+# destroying and recreating them on upgrade.
+moved {
+  from = azurerm_key_vault.integration
+  to   = azurerm_key_vault.integration[0]
+}
+
+moved {
+  from = azurerm_role_assignment.kv_secrets_officer
+  to   = azurerm_role_assignment.kv_secrets_officer[0]
+}
+
+moved {
+  from = azurerm_role_assignment.kv_secrets_user
+  to   = azurerm_role_assignment.kv_secrets_user[0]
+}
+
+moved {
+  from = azurerm_key_vault_secret.sp_client_id
+  to   = azurerm_key_vault_secret.sp_client_id[0]
+}
+
+moved {
+  from = azurerm_key_vault_secret.sp_client_secret
+  to   = azurerm_key_vault_secret.sp_client_secret[0]
 }
 
 # Create diagnostic settings for activity logs to stream to Event Hub.
@@ -407,7 +495,7 @@ resource "azurerm_monitor_aad_diagnostic_setting" "integration" {
 module "auto_discovery" {
   for_each                       = local.auto_discovery_management_group_ids
   source                         = "../auto-discovery"
-  created_by                     = data.azuread_client_config.current.object_id
+  created_by                     = data.azurerm_client_config.current_sp.object_id
   diagnostic_settings_name       = local.diagnostic_setting_name
   eventhub_authorization_rule_id = azurerm_eventhub_namespace_authorization_rule.new[0].id
   eventhub_name                  = local.eventhub_name
