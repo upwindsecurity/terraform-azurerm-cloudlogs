@@ -7,8 +7,10 @@ data "azurerm_client_config" "current_sp" {}
 # Get current subscription context to validate against `infrastructure_subscription_id`.
 data "azurerm_subscription" "current" {}
 
-# Get onboarding service principal details for Key Vault access.
+# Get onboarding service principal details for role assignments.
+# Skipped if a service principal object ID is provided.
 data "azuread_service_principal" "onboarding_sp" {
+  count     = var.onboarding_service_principal_object_id == null ? 1 : 0
   client_id = var.onboarding_service_principal_client_id
 }
 
@@ -32,8 +34,9 @@ data "azurerm_management_group" "streaming" {
 }
 
 # Data source for existing service principal (when using existing app)
-# Skipped if a service principal object ID is provided
+# Skipped if a service principal object ID is provided, or when the onboarding
+# service principal is used.
 data "azuread_service_principal" "existing_sp" {
-  count     = local.conditional_create_application || var.azure_application_service_principal_object_id != null ? 0 : 1
+  count     = var.use_onboarding_service_principal || local.conditional_create_application || var.azure_application_service_principal_object_id != null ? 0 : 1
   client_id = var.azure_application_client_id
 }

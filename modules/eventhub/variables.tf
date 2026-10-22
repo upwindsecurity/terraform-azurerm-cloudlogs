@@ -27,11 +27,43 @@ variable "infrastructure_subscription_id" {
 
 variable "onboarding_service_principal_client_id" {
   description = <<-EOT
-    The client ID of the Upwind onboarding service principal. This service
-    principal will be granted Key Vault Secrets Officer access to manage
-    the integration service principal secrets.
+    The client ID of the service principal Upwind uses in this tenant, created
+    when the tenant was onboarded and shown in the Upwind console. Without
+    `use_onboarding_service_principal` it is granted Key Vault Secrets User on
+    the integration Key Vault. With it, it is granted read access to the
+    Event Hub instead.
   EOT
   type        = string
+}
+
+variable "onboarding_service_principal_object_id" {
+  description = <<-EOT
+    Optional object ID of the service principal identified by
+    `onboarding_service_principal_client_id`. When set, the module assigns
+    roles to it directly and skips the Microsoft Graph lookup, so the
+    Terraform runner needs no Graph permissions.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.onboarding_service_principal_object_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.onboarding_service_principal_object_id))
+    error_message = "The onboarding_service_principal_object_id must be a valid GUID format."
+  }
+}
+
+variable "use_onboarding_service_principal" {
+  description = <<-EOT
+    Grant the onboarding service principal `Azure Event Hubs Data Receiver`
+    on the Event Hub namespace and `Monitoring Reader` on the infrastructure
+    subscription, instead of creating a dedicated app registration with a
+    client secret stored in a Key Vault. When true, no app registration,
+    client secret, Key Vault or Key Vault secrets are created, and the
+    service principal is only looked up, never created or managed. Defaults
+    to false so existing deployments keep their current resources.
+  EOT
+  type        = bool
+  default     = false
 }
 
 # endregion azure_integration_scope
@@ -337,7 +369,8 @@ variable "enable_auto_discovery" {
 variable "key_vault_name" {
   description = <<-EOT
     The name of the Key Vault used to store integration service principal
-    secrets and credentials.
+    secrets and credentials. Not created when
+    `use_onboarding_service_principal` is true.
   EOT
   type        = string
   default     = "upwindsecurity"

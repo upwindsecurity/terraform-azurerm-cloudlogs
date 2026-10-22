@@ -2,25 +2,41 @@
 # monitoring and processing Azure activity and Entra ID logs. It creates and
 # configures Event Hubs, diagnostic settings, service principals, and Key Vault
 # resources to handle Azure log events.
+#
+# With `use_onboarding_service_principal`, the existing onboarding service
+# principal is granted read access to the Event Hub and no app registration,
+# client secret or Key Vault is created. It is only looked up, never managed
+# here, because the onboarding deployment owns it.
 
 # Local values for resource naming and configuration.
 locals {
+  onboarding_service_principal_object_id = (
+    var.onboarding_service_principal_object_id != null
+    ? var.onboarding_service_principal_object_id
+    : data.azuread_service_principal.onboarding_sp[0].object_id
+  )
+
   # Conditional creation flags.
   conditional_create_eventhub       = !var.use_existing_eventhub
   conditional_create_resource_group = !var.use_existing_eventhub && !var.use_existing_resource_group
-  conditional_create_application    = var.azure_application_client_id == null
+  conditional_create_application    = var.azure_application_client_id == null && !var.use_onboarding_service_principal
+  conditional_create_key_vault      = !var.use_onboarding_service_principal
 
-  # Get the service principal object ID (from either new or existing)
+  # Get the service principal object ID (onboarding SP, or from either new or existing app)
   service_principal_object_id = (
-    local.conditional_create_application
+    var.use_onboarding_service_principal
+    ? local.onboarding_service_principal_object_id
+    : local.conditional_create_application
     ? azuread_service_principal.integration[0].object_id
     : var.azure_application_service_principal_object_id != null
     ? var.azure_application_service_principal_object_id
     : data.azuread_service_principal.existing_sp[0].object_id
   )
-  # Get the application client ID (from either new or existing)
+  # Get the application client ID (onboarding SP, or from either new or existing app)
   application_client_id = (
-    local.conditional_create_application
+    var.use_onboarding_service_principal
+    ? var.onboarding_service_principal_client_id
+    : local.conditional_create_application
     ? azuread_application.integration[0].client_id
     : var.azure_application_client_id
   )
@@ -299,7 +315,10 @@ resource "azurerm_role_assignment" "monitoring_reader" {
 }
 
 # Key Vault for storing integration service principal secrets.
+# Not created when the onboarding service principal is used.
 resource "azurerm_key_vault" "integration" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   name                       = local.key_vault_name
   location                   = local.region
   resource_group_name        = local.resource_group_name
@@ -322,23 +341,29 @@ resource "azurerm_key_vault" "integration" {
 
 # Role assignments for Key Vault secrets officer access for current service principal .
 resource "azurerm_role_assignment" "kv_secrets_officer" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   role_definition_name = local.role_key_vault_secrets_officer
   principal_id         = data.azurerm_client_config.current_sp.object_id
-  scope                = azurerm_key_vault.integration.id
+  scope                = azurerm_key_vault.integration[0].id
 }
 
 # Role assignments for Key Vault secrets User access for current onboarding service principal .
 resource "azurerm_role_assignment" "kv_secrets_user" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   role_definition_name = local.role_key_vault_secret_user
-  principal_id         = data.azuread_service_principal.onboarding_sp.object_id
-  scope                = azurerm_key_vault.integration.id
+  principal_id         = local.onboarding_service_principal_object_id
+  scope                = azurerm_key_vault.integration[0].id
 }
 
 # Key Vault secret for service principal client ID.
 resource "azurerm_key_vault_secret" "sp_client_id" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   name            = var.key_vault_client_id_secret_name
   value           = local.application_client_id
-  key_vault_id    = azurerm_key_vault.integration.id
+  key_vault_id    = azurerm_key_vault.integration[0].id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
   tags            = local.common_tags
@@ -351,13 +376,15 @@ resource "azurerm_key_vault_secret" "sp_client_id" {
 
 # Key Vault secret for service principal client secret.
 resource "azurerm_key_vault_secret" "sp_client_secret" {
+  count = local.conditional_create_key_vault ? 1 : 0
+
   name = var.key_vault_client_secret_secret_name
   value = (
     local.conditional_create_application
     ? [for p in azuread_application.integration[0].password : p.value][0]
     : var.azure_application_client_secret
   )
-  key_vault_id    = azurerm_key_vault.integration.id
+  key_vault_id    = azurerm_key_vault.integration[0].id
   content_type    = local.key_vault_secret_content_type
   expiration_date = var.key_vault_secret_expiration_date
   tags            = local.common_tags
@@ -366,6 +393,33 @@ resource "azurerm_key_vault_secret" "sp_client_secret" {
     azurerm_role_assignment.kv_secrets_officer,
     azurerm_role_assignment.kv_secrets_user
   ]
+}
+
+# Keep Key Vault resources created before they became conditional, instead of
+# destroying and recreating them on upgrade.
+moved {
+  from = azurerm_key_vault.integration
+  to   = azurerm_key_vault.integration[0]
+}
+
+moved {
+  from = azurerm_role_assignment.kv_secrets_officer
+  to   = azurerm_role_assignment.kv_secrets_officer[0]
+}
+
+moved {
+  from = azurerm_role_assignment.kv_secrets_user
+  to   = azurerm_role_assignment.kv_secrets_user[0]
+}
+
+moved {
+  from = azurerm_key_vault_secret.sp_client_id
+  to   = azurerm_key_vault_secret.sp_client_id[0]
+}
+
+moved {
+  from = azurerm_key_vault_secret.sp_client_secret
+  to   = azurerm_key_vault_secret.sp_client_secret[0]
 }
 
 # Create diagnostic settings for activity logs to stream to Event Hub.

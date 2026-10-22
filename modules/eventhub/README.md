@@ -6,6 +6,34 @@ with existing Event Hub setups.
 
 ## Usage
 
+### Usage Without a Client Secret
+
+Set `use_onboarding_service_principal` to grant the onboarding service principal, which Upwind already uses in your
+tenant, `Azure Event Hubs Data Receiver` on the Event Hub namespace. No app registration, client secret or Key Vault
+is created, and the service principal is only looked up, never created or managed by this module.
+
+```hcl
+module "upwind_azure_cloudlogs" {
+  source = "upwindsecurity/cloudlogs/azurerm//modules/eventhub"
+
+  # Azure configuration
+  tenant_id                      = "12345678-1234-1234-1234-123456789012"
+  infrastructure_subscription_id = "87654321-4321-4321-4321-210987654321"
+
+  # Stream from specific subscriptions
+  stream_subscription_ids = ["87654321-4321-4321-4321-210987654321"]
+
+  # Onboarding service principal, shown in the Upwind console. If the
+  # Terraform runner has no Microsoft Graph permissions, also set
+  # onboarding_service_principal_object_id to skip the lookup.
+  use_onboarding_service_principal       = true
+  onboarding_service_principal_client_id = "33333333-3333-3333-3333-333333333333"
+
+  # Entra ID logs are optional
+  diagnostic_setting_enable_entra_logs = false
+}
+```
+
 ### Basic Usage
 
 ```hcl
@@ -134,8 +162,8 @@ The executing principal needs the following permissions:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.7.0 |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.57.0 |
+| <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.10.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.81.0 |
 
 ## Modules
 
@@ -202,7 +230,7 @@ The executing principal needs the following permissions:
 | <a name="input_infrastructure_subscription_id"></a> [infrastructure\_subscription\_id](#input\_infrastructure\_subscription\_id) | The subscription ID where the infrastructure resources (Event Hub, Key<br/>Vault, Service Principal, etc.) will be deployed or already exist. This<br/>must match the subscription context of your authenticated Azure provider. | `string` | n/a | yes |
 | <a name="input_key_vault_client_id_secret_name"></a> [key\_vault\_client\_id\_secret\_name](#input\_key\_vault\_client\_id\_secret\_name) | The name of the Key Vault secret for service principal client ID. | `string` | `"sp-client-id"` | no |
 | <a name="input_key_vault_client_secret_secret_name"></a> [key\_vault\_client\_secret\_secret\_name](#input\_key\_vault\_client\_secret\_secret\_name) | The name of the Key Vault secret for service principal client secret. | `string` | `"sp-client-secret"` | no |
-| <a name="input_key_vault_name"></a> [key\_vault\_name](#input\_key\_vault\_name) | The name of the Key Vault used to store integration service principal<br/>secrets and credentials. | `string` | `"upwindsecurity"` | no |
+| <a name="input_key_vault_name"></a> [key\_vault\_name](#input\_key\_vault\_name) | The name of the Key Vault used to store integration service principal<br/>secrets and credentials. Not created when<br/>`use_onboarding_service_principal` is true. | `string` | `"upwindsecurity"` | no |
 | <a name="input_key_vault_network_acls_bypass"></a> [key\_vault\_network\_acls\_bypass](#input\_key\_vault\_network\_acls\_bypass) | Specifies which traffic can bypass the network rules. Possible values are<br/>`AzureServices` and `None`. Only used when `key_vault_network_acls_enabled` is `true`. | `string` | `"AzureServices"` | no |
 | <a name="input_key_vault_network_acls_default_action"></a> [key\_vault\_network\_acls\_default\_action](#input\_key\_vault\_network\_acls\_default\_action) | The default action to use when no rules match from `ip_rules` / `virtual_network_subnet_ids`.<br/>Possible values are `Allow` and `Deny`. Only used when `key_vault_network_acls_enabled` is `true`. | `string` | `"Deny"` | no |
 | <a name="input_key_vault_network_acls_enabled"></a> [key\_vault\_network\_acls\_enabled](#input\_key\_vault\_network\_acls\_enabled) | Whether to enable network ACLs for the Key Vault. When enabled, network<br/>access rules will be applied based on the other network ACL variables. | `bool` | `false` | no |
@@ -212,7 +240,8 @@ The executing principal needs the following permissions:
 | <a name="input_key_vault_rbac_authorization_enabled"></a> [key\_vault\_rbac\_authorization\_enabled](#input\_key\_vault\_rbac\_authorization\_enabled) | Whether to enable RBAC authorization for the Key Vault. | `bool` | `true` | no |
 | <a name="input_key_vault_secret_expiration_date"></a> [key\_vault\_secret\_expiration\_date](#input\_key\_vault\_secret\_expiration\_date) | The expiration date for the Key Vault secrets in RFC3339 format<br/>(e.g., `2025-12-31T23:59:59Z`). If not specified, secrets will not expire. | `string` | `null` | no |
 | <a name="input_key_vault_sku_name"></a> [key\_vault\_sku\_name](#input\_key\_vault\_sku\_name) | The SKU name of the Key Vault. | `string` | `"standard"` | no |
-| <a name="input_onboarding_service_principal_client_id"></a> [onboarding\_service\_principal\_client\_id](#input\_onboarding\_service\_principal\_client\_id) | The client ID of the Upwind onboarding service principal. This service<br/>principal will be granted Key Vault Secrets Officer access to manage<br/>the integration service principal secrets. | `string` | n/a | yes |
+| <a name="input_onboarding_service_principal_client_id"></a> [onboarding\_service\_principal\_client\_id](#input\_onboarding\_service\_principal\_client\_id) | The client ID of the service principal Upwind uses in this tenant, created<br/>when the tenant was onboarded and shown in the Upwind console. Without<br/>`use_onboarding_service_principal` it is granted Key Vault Secrets User on<br/>the integration Key Vault. With it, it is granted read access to the<br/>Event Hub instead. | `string` | n/a | yes |
+| <a name="input_onboarding_service_principal_object_id"></a> [onboarding\_service\_principal\_object\_id](#input\_onboarding\_service\_principal\_object\_id) | Optional object ID of the service principal identified by<br/>`onboarding_service_principal_client_id`. When set, the module assigns<br/>roles to it directly and skips the Microsoft Graph lookup, so the<br/>Terraform runner needs no Graph permissions. | `string` | `null` | no |
 | <a name="input_region"></a> [region](#input\_region) | The region where the integration resources will be created or the existing<br/>Event Hub. | `string` | `"eastus"` | no |
 | <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name) | The name of the existing resource group for the Event Hub. | `string` | `"upwindsecurity"` | no |
 | <a name="input_resource_suffix"></a> [resource\_suffix](#input\_resource\_suffix) | The suffix to append to all resources created by this module. | `string` | `""` | no |
@@ -224,17 +253,18 @@ The executing principal needs the following permissions:
 | <a name="input_tenant_id"></a> [tenant\_id](#input\_tenant\_id) | The Azure Tenant that will be onboarded to the Upwind Azure Monitor Logs monitoring. | `string` | n/a | yes |
 | <a name="input_use_existing_eventhub"></a> [use\_existing\_eventhub](#input\_use\_existing\_eventhub) | Whether to use an existing Event Hub. If false, create a new one. | `bool` | `false` | no |
 | <a name="input_use_existing_resource_group"></a> [use\_existing\_resource\_group](#input\_use\_existing\_resource\_group) | Whether to use an existing resource group. If false, create a new one. | `bool` | `false` | no |
+| <a name="input_use_onboarding_service_principal"></a> [use\_onboarding\_service\_principal](#input\_use\_onboarding\_service\_principal) | Grant the onboarding service principal `Azure Event Hubs Data Receiver`<br/>on the Event Hub namespace and `Monitoring Reader` on the infrastructure<br/>subscription, instead of creating a dedicated app registration with a<br/>client secret stored in a Key Vault. When true, no app registration,<br/>client secret, Key Vault or Key Vault secrets are created, and the<br/>service principal is only looked up, never created or managed. Defaults<br/>to false so existing deployments keep their current resources. | `bool` | `false` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_application_client_id"></a> [application\_client\_id](#output\_application\_client\_id) | The client ID of the Azure AD application. |
-| <a name="output_application_name"></a> [application\_name](#output\_application\_name) | The display name of the Azure AD application. |
+| <a name="output_application_client_id"></a> [application\_client\_id](#output\_application\_client\_id) | The client ID of the Azure AD application, or of the onboarding service principal when it is used. |
+| <a name="output_application_name"></a> [application\_name](#output\_application\_name) | The display name of the Azure AD application. Null when the onboarding service principal is used. |
 | <a name="output_eventhub_consumer_group_name"></a> [eventhub\_consumer\_group\_name](#output\_eventhub\_consumer\_group\_name) | The name of the consumer group created for processing logs. |
 | <a name="output_eventhub_name"></a> [eventhub\_name](#output\_eventhub\_name) | The name of the Event Hub used for Azure Monitor Logs monitoring. |
 | <a name="output_eventhub_namespace_name"></a> [eventhub\_namespace\_name](#output\_eventhub\_namespace\_name) | The name of the Event Hub namespace used for Azure Monitor Logs monitoring. |
-| <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | The name of the Azure Key Vault that contains the integration service<br/>principal secrets. |
+| <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | The name of the Azure Key Vault that contains the integration service<br/>principal secrets. Null when the onboarding service principal is used. |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | The name of the resource group where Event Hub resources are deployed. |
 | <a name="output_service_principal_object_id"></a> [service\_principal\_object\_id](#output\_service\_principal\_object\_id) | The object ID of the integration service principal. |
 <!-- END_TF_DOCS -->
