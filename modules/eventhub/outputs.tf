@@ -19,18 +19,13 @@ output "resource_group_name" {
 }
 
 output "application_name" {
-  description = "The display name of the Azure AD application. Null in WIF mode (the app registration lives in Upwind's tenant, not this one)."
-  value       = local.wif_enabled ? null : (local.conditional_create_application ? local.app_name : var.azure_application_client_id)
+  description = "The display name of the Azure AD application. Null when the onboarding service principal is used."
+  value       = var.use_onboarding_service_principal ? null : (local.conditional_create_application ? local.app_name : var.azure_application_client_id)
 }
 
 output "application_client_id" {
-  description = "The client ID of the Azure AD application. In WIF mode this is the org's Upwind-minted WIF app registration (null when only fetcher_app_service_principal_object_id was supplied)."
+  description = "The client ID of the Azure AD application, or of the onboarding service principal when it is used."
   value       = local.application_client_id
-}
-
-output "workload_identity_federation_enabled" {
-  description = "Whether the secretless WIF flow was used (no app registration, client secret or Key Vault created in this tenant)."
-  value       = local.wif_enabled
 }
 
 output "service_principal_object_id" {
@@ -41,7 +36,7 @@ output "service_principal_object_id" {
 output "key_vault_name" {
   description = <<-EOT
     The name of the Azure Key Vault that contains the integration service
-    principal secrets. Null in WIF mode (no Key Vault is created).
+    principal secrets. Null when the onboarding service principal is used.
   EOT
   value       = local.conditional_create_key_vault ? local.key_vault_name : null
 }

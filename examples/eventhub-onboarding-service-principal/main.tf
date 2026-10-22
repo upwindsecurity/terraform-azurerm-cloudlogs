@@ -1,9 +1,6 @@
-# Workload Identity Federation (WIF) Azure Monitor Logs example.
-# Secretless cloud-logs onboarding: no app registration, client secret or Key
-# Vault is created in this tenant. The auth identity is the org's Upwind-minted
-# multi-tenant WIF (Fetcher) app registration - the same one used by
-# terraform-azurerm-onboarding. This tenant only materializes its consented
-# service principal and grants it read access to the Event Hub.
+# Azure Monitor Logs example without a client secret or Key Vault. The
+# onboarding service principal, which Upwind already uses in this tenant, is
+# granted read access to the Event Hub.
 
 # ============================================================================
 # CONFIGURATION
@@ -19,9 +16,8 @@ locals {
     "87654321-4321-4321-4321-210987654321",
   ]
 
-  # The org's Upwind-minted WIF (Fetcher) app registration, shown in the
-  # Upwind console after adding the Azure organization.
-  fetcher_app_client_id = "33333333-3333-3333-3333-333333333333"
+  # Onboarding service principal client ID, shown in the Upwind console.
+  onboarding_service_principal_client_id = "33333333-3333-3333-3333-333333333333"
 }
 
 # ============================================================================
@@ -57,13 +53,11 @@ module "upwind_azure_cloudlogs" {
   # Stream from specific subscriptions.
   stream_subscription_ids = local.stream_subscription_ids
 
-  # Workload identity federation (default true; shown here for clarity).
-  # If the Terraform runner lacks Microsoft Graph permissions to create
-  # service principals, pre-consent the app
-  # (`az ad sp create --id <fetcher_app_client_id>`) and supply
-  # fetcher_app_service_principal_object_id instead of fetcher_app_client_id.
-  use_workload_identity_federation = true
-  fetcher_app_client_id            = local.fetcher_app_client_id
+  # Grant the onboarding service principal read access to the Event Hub.
+  # If the Terraform runner has no Microsoft Graph permissions, also set
+  # onboarding_service_principal_object_id to skip the lookup.
+  use_onboarding_service_principal       = true
+  onboarding_service_principal_client_id = local.onboarding_service_principal_client_id
 
   # Entra ID logs are optional; disable when the tenant does not allow an
   # Entra ID diagnostic setting.
